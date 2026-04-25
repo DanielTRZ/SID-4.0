@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Słowniki | SID 4.0{% endblock %}
+{% block page_title %}Słowniki kategorii i marek{% endblock %}
+{% block page_subtitle %}Porządkowanie powtarzalnych wartości bez ingerencji w obecne rekordy.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-book"></i> Dodaj wartość słownika</h3><span>Kategorie, marki i lokalizacje</span></div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Typ</label><select name="dict_type"><option value="category">Kategoria</option><option value="brand">Marka</option><option value="location">Lokalizacja</option></select></div>
+            <div class="form-group"><label>Wartość</label><input type="text" name="value" required></div>
+            <button type="submit" class="btn-submit full-row">Dodaj do słownika</button>
+        </form>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-list"></i> Zawartość słowników</h3><span>Aktualne wartości</span></div>
+        <div class="grid-two">
+            <div><h4>Kategorie</h4><ul class="simple-list">{% for item in dictionaries.category %}<li>{{ item.value }}</li>{% else %}<li>Brak wartości.</li>{% endfor %}</ul></div>
+            <div><h4>Marki</h4><ul class="simple-list">{% for item in dictionaries.brand %}<li>{{ item.value }}</li>{% else %}<li>Brak wartości.</li>{% endfor %}</ul></div>
+        </div>
+        <div style="margin-top:14px;"><h4>Lokalizacje</h4><ul class="simple-list">{% for item in dictionaries.location %}<li>{{ item.value }}</li>{% else %}<li>Brak wartości.</li>{% endfor %}</ul></div>
+    </article>
+</section>
+{% endblock %}

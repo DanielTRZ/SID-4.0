@@ -1,0 +1,8 @@
+﻿{% extends "base.html" %}
+{% block title %}Dashboard właściciela | SID 4.0{% endblock %}
+{% block page_title %}Dashboard właściciela{% endblock %}
+{% block page_subtitle %}Wysoki poziom kontroli nad sprzedażą, marżą, zadaniami i ryzykami magazynowymi.{% endblock %}
+{% block content %}
+<section class="stats-grid"><article class="stat-card"><span>Sprzedaż dziś</span><h3>{{ "%.2f"|format(metrics.sales_today) }} zł</h3></article><article class="stat-card"><span>Szacowana marża</span><h3>{{ "%.2f"|format(metrics.estimated_margin) }} zł</h3></article><article class="stat-card"><span>Martwy magazyn</span><h3>{{ metrics.dead_stock_count }}</h3></article><article class="stat-card"><span>Zarezerwowane sztuki</span><h3>{{ metrics.reserved_units }}</h3></article><article class="stat-card"><span>Otwarte zadania</span><h3>{{ metrics.open_tasks_count }}</h3></article><article class="stat-card"><span>Otwarte zamówienia</span><h3>{{ metrics.open_orders }}</h3></article></section>
+<section class="panel-card"><div class="panel-head"><h3><i class="fas fa-compass"></i> Szybka interpretacja</h3><span>Na co zwrócić uwagę</span></div><ul class="simple-list"><li>Wartość magazynu: {{ "%.2f"|format(metrics.inventory.total_value) }} zł</li><li>Niski stan: {{ metrics.inventory.low_stock_count }} pozycji</li><li>Po terminie: {{ metrics.inventory.expired_count }} pozycji</li><li>Brak ceny: {{ metrics.inventory.missing_price_count }} pozycji</li></ul></section>
+{% endblock %}

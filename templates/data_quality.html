@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Jakość danych | SID 4.0{% endblock %}
+{% block page_title %}Ocena jakości danych{% endblock %}
+{% block page_subtitle %}Kontrola brakujących SKU, EAN, marek, cen, minimów i zdjęć.{% endblock %}
+{% block content %}
+<section class="stats-grid compact">
+    <article class="stat-card"><span>Bez SKU</span><h3>{{ quality.missing_sku|length }}</h3></article>
+    <article class="stat-card"><span>Bez EAN</span><h3>{{ quality.missing_ean|length }}</h3></article>
+    <article class="stat-card"><span>Bez marki</span><h3>{{ quality.missing_brand|length }}</h3></article>
+    <article class="stat-card"><span>Bez cen</span><h3>{{ quality.missing_prices|length }}</h3></article>
+    <article class="stat-card"><span>Bez minimum</span><h3>{{ quality.missing_minimums|length }}</h3></article>
+    <article class="stat-card"><span>Bez zdjęcia</span><h3>{{ quality.missing_images|length }}</h3></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card"><div class="panel-head"><h3>Brak identyfikatorów</h3><span>SKU i EAN</span></div><ul class="simple-list">{% for item in quality.missing_sku %}<li>{{ item.title }} · brak SKU</li>{% endfor %}{% for item in quality.missing_ean %}<li>{{ item.title }} · brak EAN</li>{% endfor %}{% if not quality.missing_sku and not quality.missing_ean %}<li>Identyfikatory są kompletne.</li>{% endif %}</ul></article>
+    <article class="panel-card"><div class="panel-head"><h3>Brak opisu handlowego</h3><span>Marka, minimum, zdjęcie</span></div><ul class="simple-list">{% for item in quality.missing_brand %}<li>{{ item.title }} · brak marki</li>{% endfor %}{% for item in quality.missing_minimums %}<li>{{ item.title }} · brak stanu minimalnego</li>{% endfor %}{% for item in quality.missing_images %}<li>{{ item.title }} · brak zdjęcia</li>{% endfor %}{% if not quality.missing_brand and not quality.missing_minimums and not quality.missing_images %}<li>Opis jakościowy jest kompletny.</li>{% endif %}</ul></article>
+</section>
+<section class="panel-card"><div class="panel-head"><h3>Braki cenowe</h3><span>Produkty do uzupełnienia</span></div><ul class="simple-list">{% for item in quality.missing_prices %}<li>{{ item.title }} · zakup {{ item.purchase_price }} / sprzedaż {{ item.sale_price }}</li>{% else %}<li>Wszystkie produkty mają ceny.</li>{% endfor %}</ul></section>
+{% endblock %}

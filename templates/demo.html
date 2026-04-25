@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Tryb demo | SID 4.0{% endblock %}
+{% block page_title %}Tryb demo / szkoleniowy{% endblock %}
+{% block page_subtitle %}Bezpieczny podgląd szkoleniowy z przykładowymi danymi i możliwością przełączania sesji demo.{% endblock %}
+{% block content %}
+<section class="stats-grid">
+    <article class="stat-card"><span>Sprzedaż demo</span><h3>{{ "%.2f"|format(demo.sales_today) }} zł</h3></article>
+    <article class="stat-card"><span>Zamówienia</span><h3>{{ demo.orders }}</h3></article>
+    <article class="stat-card"><span>Alerty</span><h3>{{ demo.alerts }}</h3></article>
+    <article class="stat-card"><span>Marża</span><h3>{{ "%.2f"|format(demo.margin) }} zł</h3></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card"><div class="panel-head"><h3><i class="fas fa-flask"></i> Szkolenie</h3><span>Tryb testowy bez ryzyka</span></div><ul class="simple-list"><li>Pokazuje przykładowe KPI</li><li>Nie wymaga zmiany realnych danych</li><li>Może służyć do onboardingu nowych osób</li></ul><div class="topbar-actions" style="margin-top:16px;"><a href="{{ url_for('demo_toggle') }}" class="btn-primary">Przełącz demo w sesji</a></div></article>
+    <article class="panel-card"><div class="panel-head"><h3><i class="fas fa-chart-pie"></i> Przykładowa struktura</h3><span>Dane demonstracyjne</span></div><canvas id="demo-chart"></canvas></article>
+</section>
+<script id="demo-data" type="application/json">{{ demo|tojson }}</script>
+{% endblock %}

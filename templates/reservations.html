@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Rezerwacje | SID 4.0{% endblock %}
+{% block page_title %}Rezerwacje towaru{% endblock %}
+{% block page_subtitle %}Odkładanie części stanu dla klienta, odbioru lub realizacji zamówienia.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-bookmark"></i> Dodaj rezerwację</h3><span>Nie zmienia stanu głównego, ale odkłada towar w planowaniu</span></div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Partia</label><select name="batch_id">{% for item in inventory_items %}<option value="{{ item.batch_id }}">{{ item.title }} · {{ item.warehouse_name }} · dostępne {{ item.available_quantity_int }} / rez. {{ item.reserved_quantity_int }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Klient</label><select name="customer_id"><option value="">Klient detaliczny</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" required></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Zarezerwuj</button>
+        </form>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-list"></i> Aktualne rezerwacje</h3><span>Podgląd rezerwowanego towaru</span></div>
+        <ul class="audit-list">{% for item in reservations %}<li><strong>{{ item.product_title }}</strong><p>{{ item.customer_name }} · {{ item.quantity }} szt. · {{ item.status }}</p><span>{{ item.warehouse_name }} · {{ item.created_at }}</span>{% if item.status == 'reserved' %}<div class="topbar-actions" style="margin-top:10px;"><a href="{{ url_for('reservation_release', reservation_id=item.id) }}" class="btn-secondary">Zwolnij</a></div>{% endif %}</li>{% else %}<li><strong>Brak rezerwacji</strong><p>Nie ma odłożonego towaru.</p></li>{% endfor %}</ul>
+    </article>
+</section>
+{% endblock %}

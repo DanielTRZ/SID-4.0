@@ -1,0 +1,3 @@
+python project.py
+cd "C:\Users\zgred\OneDrive\Desktop\cs50pprojektkońcowy"
+"C:\Users\zgred\OneDrive\Desktop\cs50pprojektkońcowy"

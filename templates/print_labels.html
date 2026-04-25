@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Etykiety</title>
+    <style>
+        body{font-family:Arial,sans-serif;margin:20px}
+        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+        .label{border:2px solid #111;padding:12px;border-radius:10px}
+        .small{font-size:12px;color:#555}
+        @media print{button{display:none}}
+    </style>
+</head>
+<body>
+    <button onclick="window.print()">Drukuj</button>
+    <div class="grid">
+        {% for item in items %}
+            <div class="label">
+                <h3>{{ item.title }}</h3>
+                <div class="small">SKU: {{ item.sku or '-' }}</div>
+                <div class="small">EAN: {{ item.ean or '-' }}</div>
+                <div>Magazyn: {{ item.warehouse_name }}</div>
+                <div>Cena: {{ "%.2f"|format(item.sale_price_float) }} zł</div>
+                <div>Stan: {{ item.quantity_int }}</div>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

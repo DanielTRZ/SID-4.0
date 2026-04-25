@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Zakupy | SID 4.0{% endblock %}
+{% block page_title %}Zakupy i dostawy{% endblock %}
+{% block page_subtitle %}Przyjęcia towaru, zamówienia do dostawców i uzupełnianie stanów.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-truck-loading"></i> Przyjęcie dostawy</h3>
+            <span>Tworzy zakup, partię i aktualizuje magazyn</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group">
+                <label>Produkt</label>
+                <select name="product_id" required>
+                    <option value="">Wybierz</option>
+                    {% for product in products %}
+                        <option value="{{ product.id }}">{{ product.title }} {% if product.sku %}({{ product.sku }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Dostawca</label>
+                <select name="supplier_id">
+                    <option value="">Brak</option>
+                    {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Magazyn</label>
+                <select name="warehouse_id" required>
+                    <option value="">Wybierz</option>
+                    {% for warehouse in warehouses %}
+                        <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" required></div>
+            <div class="form-group"><label>Cena zakupu</label><input type="number" step="0.01" name="unit_cost" required></div>
+            <div class="form-group"><label>Cena sprzedaży</label><input type="number" step="0.01" name="sale_price"></div>
+            <div class="form-group"><label>Data zakupu</label><input type="date" name="purchase_date"></div>
+            <div class="form-group"><label>Data ważności</label><input type="date" name="expiry_date"></div>
+            <div class="form-group"><label>Partia</label><input type="text" name="lot_number"></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Przyjmij dostawę</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-file-invoice"></i> Ostatnie zakupy</h3>
+            <span>Lista przyjęć i zamówień</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Dostawca</th>
+                        <th>Magazyn</th>
+                        <th>Status</th>
+                        <th>Kwota</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in purchase_orders %}
+                        <tr>
+                            <td>#{{ order.id }}</td>
+                            <td>{{ order.supplier_name }}</td>
+                            <td>{{ order.warehouse_name }}</td>
+                            <td>{{ order.status }}</td>
+                            <td>{{ "%.2f"|format(order.total_amount) }} zł</td>
+                            <td>{{ order.created_at }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6">Brak zamówień zakupu.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

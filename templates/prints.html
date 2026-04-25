@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Etykiety i wydruki | SID 4.0{% endblock %}
+{% block page_title %}Etykiety i wydruki{% endblock %}
+{% block page_subtitle %}Przygotuj etykiety produktów, cenówki i listy kompletacyjne bez zmiany magazynu.{% endblock %}
+{% block content %}
+<section class="panel-card">
+    <div class="panel-head"><h3><i class="fas fa-print"></i> Wydruk etykiet</h3><span>Zaznacz partie do wydruku</span></div>
+    <form method="POST" action="{{ url_for('print_labels') }}">
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th></th><th>Produkt</th><th>Magazyn</th><th>Stan</th><th>Cena sprzedaży</th></tr></thead>
+                <tbody>
+                    {% for item in inventory_items %}
+                        <tr>
+                            <td><input type="checkbox" name="batch_ids" value="{{ item.batch_id }}"></td>
+                            <td>{{ item.title }}</td>
+                            <td>{{ item.warehouse_name }}</td>
+                            <td>{{ item.quantity_int }}</td>
+                            <td>{{ "%.2f"|format(item.sale_price_float) }} zł</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5">Brak pozycji do wydruku.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="topbar-actions" style="margin-top:16px;">
+            <button type="submit" class="btn-primary"><i class="fas fa-tags"></i> Otwórz etykiety</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Załączniki | SID 4.0{% endblock %}
+{% block page_title %}Załączniki rozszerzone{% endblock %}
+{% block page_subtitle %}Instrukcje, karty produktów, skany faktur i zdjęcia dostaw w jednym miejscu.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-paperclip"></i> Dodaj załącznik</h3><span>Powiąż plik z produktem lub partią</span></div>
+        <form method="POST" enctype="multipart/form-data" class="form-grid">
+            <div class="form-group"><label>Etykieta</label><input type="text" name="label" required></div>
+            <div class="form-group"><label>Typ encji</label><select name="entity_type"><option value="product">Produkt</option><option value="batch">Partia</option></select></div>
+            <div class="form-group"><label>ID produktu</label><select name="entity_id">{% for product in products %}<option value="{{ product.id }}">{{ product.title }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Plik</label><input type="file" name="file" required></div>
+            <button type="submit" class="btn-submit full-row">Zapisz załącznik</button>
+        </form>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-folder-open"></i> Ostatnie pliki</h3><span>Podgląd załączonych materiałów</span></div>
+        <ul class="audit-list">{% for file in attachments %}<li><strong>{{ file.label }}</strong><p>{{ file.entity_type }} #{{ file.entity_id }}</p><span>{{ file.user_name }} · {{ file.created_at }}</span><div class="topbar-actions" style="margin-top:10px;"><a href="{{ file.file_url }}" target="_blank" class="btn-secondary">Otwórz plik</a></div></li>{% else %}<li><strong>Brak załączników</strong><p>Dodaj pierwszy plik.</p></li>{% endfor %}</ul>
+    </article>
+</section>
+{% endblock %}

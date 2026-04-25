@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Klienci | SID 4.0{% endblock %}
+{% block page_title %}Klienci{% endblock %}
+{% block page_subtitle %}Kartoteka klientów detalicznych i firmowych.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-user-plus"></i> Dodaj klienta</h3>
+            <span>Dane do sprzedaży i dokumentów</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Nazwa</label><input type="text" name="name" required></div>
+            <div class="form-group"><label>NIP</label><input type="text" name="tax_id"></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email"></div>
+            <div class="form-group"><label>Telefon</label><input type="text" name="phone"></div>
+            <div class="form-group full-row"><label>Adres</label><input type="text" name="address"></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Zapisz klienta</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-users"></i> Lista klientów</h3>
+            <span>{{ customers|length }} pozycji</span>
+        </div>
+        <ul class="entity-list">
+            {% for customer in customers %}
+                <li>
+                    <strong>{{ customer.name }}</strong>
+                    <p>{{ customer.tax_id or 'bez NIP' }} · {{ customer.phone or 'brak telefonu' }}</p>
+                    <span>{{ customer.email or 'brak maila' }}</span>
+                </li>
+            {% else %}
+                <li>Brak klientów.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+{% endblock %}

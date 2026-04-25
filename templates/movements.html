@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Ruchy magazynowe | SID 4.0{% endblock %}
+{% block page_title %}Ruchy magazynowe{% endblock %}
+{% block page_subtitle %}Korekty stanów, przesunięcia między magazynami i historia ruchów.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-right-left"></i> Dodaj ruch</h3>
+            <span>Korekta przyjęcia, wydania lub transfer</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group">
+                <label>Partia</label>
+                <select name="batch_id" required>
+                    <option value="">Wybierz</option>
+                    {% for item in inventory_items %}
+                        <option value="{{ item.batch_id }}">{{ item.title }} · {{ item.warehouse_name }} · {{ item.quantity_int }} szt.</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Typ ruchu</label>
+                <select name="movement_type" required>
+                    <option value="adjustment_in">Korekta na plus</option>
+                    <option value="adjustment_out">Korekta na minus</option>
+                    <option value="transfer">Przesunięcie</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" required></div>
+            <div class="form-group">
+                <label>Magazyn docelowy</label>
+                <select name="target_warehouse_id">
+                    <option value="">Nie dotyczy</option>
+                    {% for warehouse in warehouses %}
+                        <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Zapisz ruch</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-clock-rotate-left"></i> Historia ruchów</h3>
+            <span>Ostatnie operacje magazynowe</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Produkt</th>
+                        <th>Magazyn</th>
+                        <th>Typ</th>
+                        <th>Ilość</th>
+                        <th>Operator</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for move in movements %}
+                        <tr>
+                            <td>{{ move.created_at }}</td>
+                            <td>{{ move.product_title }}</td>
+                            <td>{{ move.warehouse_name }}</td>
+                            <td>{{ move.movement_type }}</td>
+                            <td>{{ move.quantity }}</td>
+                            <td>{{ move.user_name }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6">Brak ruchów magazynowych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

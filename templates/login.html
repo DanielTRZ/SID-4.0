@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logowanie | SID 4.0</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="login-page">
+    <section class="login-card">
+        <div class="brand-block centered">
+            <h1>SID 4.0</h1>
+            <p>System dla sklepu, magazynu i sprzedaży</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-stack">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="login-form">
+            <div class="form-group">
+                <label>Login</label>
+                <input type="text" name="username" placeholder="admin" required>
+            </div>
+            <div class="form-group">
+                <label>Hasło</label>
+                <input type="password" name="password" placeholder="admin123" required>
+            </div>
+            <button type="submit" class="btn-submit"><i class="fas fa-right-to-bracket"></i> Zaloguj</button>
+        </form>
+
+        <div class="login-help">
+            <strong>Start:</strong> konto domyślne to `admin` / `admin123`
+        </div>
+    </section>
+</body>
+</html>

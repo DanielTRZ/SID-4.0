@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Eksporty menedżerskie | SID 4.0{% endblock %}
+{% block page_title %}Eksporty menedżerskie{% endblock %}
+{% block page_subtitle %}Gotowe pliki CSV dla właściciela, księgowości i analizy biznesowej.{% endblock %}
+{% block content %}
+<section class="panel-card">
+    <div class="panel-head"><h3><i class="fas fa-file-lines"></i> Pobierz gotowe raporty</h3><span>Każdy eksport trafia też do archiwum</span></div>
+    <div class="action-stack">
+        <a href="{{ url_for('manager_export_file', kind='daily-sales') }}" class="btn-primary">Sprzedaż dzienna</a>
+        <a href="{{ url_for('manager_export_file', kind='top-products') }}" class="btn-primary">Top produkty</a>
+        <a href="{{ url_for('manager_export_file', kind='dead-stock') }}" class="btn-primary">Martwy magazyn</a>
+        <a href="{{ url_for('manager_export_file', kind='shortages') }}" class="btn-primary">Niedobory</a>
+        <a href="{{ url_for('manager_export_file', kind='inventory-value') }}" class="btn-primary">Wartość magazynu</a>
+    </div>
+</section>
+{% endblock %}

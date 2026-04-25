@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Notatki | SID 4.0{% endblock %}
+{% block page_title %}Notatki wewnętrzne{% endblock %}
+{% block page_subtitle %}Komentarze do produktów i partii bez ingerencji w główne dane.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-note-sticky"></i> Dodaj notatkę</h3><span>Wewnętrzne informacje operacyjne</span></div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Tytuł</label><input type="text" name="title" required></div>
+            <div class="form-group"><label>Typ encji</label><select name="entity_type"><option value="product">Produkt</option><option value="batch">Partia</option></select></div>
+            <div class="form-group"><label>ID produktu</label><select name="entity_id">{% for product in products %}<option value="{{ product.id }}">{{ product.title }}</option>{% endfor %}</select></div>
+            <div class="form-group full-row"><label>Treść</label><textarea name="content" rows="5" required></textarea></div>
+            <button type="submit" class="btn-submit full-row">Zapisz notatkę</button>
+        </form>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-clock"></i> Ostatnie notatki</h3><span>Historia wpisów</span></div>
+        <ul class="audit-list">{% for note in notes %}<li><strong>{{ note.title }}</strong><p>{{ note.content }}</p><span>{{ note.entity_type }} #{{ note.entity_id }} · {{ note.user_name }} · {{ note.created_at }}</span></li>{% else %}<li><strong>Brak notatek</strong><p>Dodaj pierwszą notatkę operacyjną.</p></li>{% endfor %}</ul>
+    </article>
+</section>
+{% endblock %}

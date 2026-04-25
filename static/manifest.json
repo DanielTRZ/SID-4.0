@@ -1,0 +1,16 @@
+{
+  "short_name": "SID Daniel",
+  "name": "System Inwentaryzacji Domowej - Daniel",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3081/3081840.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#4f46e5",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#4f46e5"
+}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | SID 4.0{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Najważniejsze wskaźniki sklepu, magazynu i sprzedaży w jednym miejscu.{% endblock %}
+{% block content %}
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Sprzedaż dziś</span>
+        <h3>{{ "%.2f"|format(metrics.sales_today) }} zł</h3>
+    </article>
+    <article class="stat-card">
+        <span>Zakupy dziś</span>
+        <h3>{{ "%.2f"|format(metrics.purchases_today) }} zł</h3>
+    </article>
+    <article class="stat-card">
+        <span>Wartość magazynu</span>
+        <h3>{{ "%.2f"|format(metrics.inventory.total_value) }} zł</h3>
+    </article>
+    <article class="stat-card">
+        <span>Otwarte zamówienia</span>
+        <h3>{{ metrics.open_orders }}</h3>
+    </article>
+    <article class="stat-card">
+        <span>Produkty</span>
+        <h3>{{ metrics.products_count }}</h3>
+    </article>
+    <article class="stat-card">
+        <span>Klienci / dostawcy</span>
+        <h3>{{ metrics.customers_count }} / {{ metrics.suppliers_count }}</h3>
+    </article>
+</section>
+
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-bell"></i> Alarmy magazynowe</h3>
+            <span>Niski stan i produkty po terminie</span>
+        </div>
+        <div class="alert-columns">
+            <div>
+                <h4>Niski stan</h4>
+                <ul class="simple-list">
+                    {% if metrics.inventory.low_stock_items %}
+                        {% for item in metrics.inventory.low_stock_items %}
+                            <li>{{ item.title }} · {{ item.quantity_int }} / min {{ item.min_quantity_int }}</li>
+                        {% endfor %}
+                    {% else %}
+                        <li>Brak krytycznych braków.</li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div>
+                <h4>Po terminie</h4>
+                <ul class="simple-list">
+                    {% if metrics.inventory.expired_items %}
+                        {% for item in metrics.inventory.expired_items %}
+                            <li>{{ item.title }} · {{ item.expiry_date }}</li>
+                        {% endfor %}
+                    {% else %}
+                        <li>Brak produktów po terminie.</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-chart-column"></i> Najlepiej rotujące produkty</h3>
+            <span>Na podstawie zapisanej sprzedaży</span>
+        </div>
+        <canvas id="top-sellers-chart"></canvas>
+    </article>
+</section>
+
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-chart-pie"></i> Struktura magazynu</h3>
+            <span>Podział wartości według kategorii</span>
+        </div>
+        <canvas id="category-chart"></canvas>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-clock-rotate-left"></i> Ostatnie akcje</h3>
+            <span>Audyt systemu</span>
+        </div>
+        <ul class="audit-list">
+            {% for item in recent_audit %}
+                <li>
+                    <strong>{{ item.action }} · {{ item.entity }}</strong>
+                    <p>{{ item.details }}</p>
+                    <span>{{ item.user_name }} · {{ item.created_at }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+
+<section class="panel-card">
+    <div class="panel-head">
+        <h3><i class="fas fa-receipt"></i> Ostatnie sprzedaże</h3>
+        <span>Podgląd ostatnich transakcji</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Klient</th>
+                    <th>Magazyn</th>
+                    <th>Płatność</th>
+                    <th>Kwota</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in recent_sales %}
+                    <tr>
+                        <td>#{{ sale.id }}</td>
+                        <td>{{ sale.customer_name }}</td>
+                        <td>{{ sale.warehouse_name }}</td>
+                        <td>{{ sale.payment_method }}</td>
+                        <td>{{ "%.2f"|format(sale.total_amount) }} zł</td>
+                        <td>{{ sale.created_at }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">Brak sprzedaży do wyświetlenia.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<script id="dashboard-data" type="application/json">{{ metrics|tojson }}</script>
+{% endblock %}

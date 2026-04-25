@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Produkty | SID 4.0{% endblock %}
+{% block page_title %}Kartoteka produktów{% endblock %}
+{% block page_subtitle %}Pełna baza produktów z kodami, cenami, markami i progami minimalnymi.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-box-open"></i> Dodaj produkt</h3>
+            <span>Nowa kartoteka do sprzedaży i magazynu</span>
+        </div>
+        <form method="POST" enctype="multipart/form-data" class="form-grid">
+            <div class="form-group"><label>Nazwa</label><input type="text" name="title" required></div>
+            <div class="form-group"><label>Kategoria</label><input type="text" name="category"></div>
+            <div class="form-group"><label>Marka</label><input type="text" name="brand"></div>
+            <div class="form-group"><label>Jednostka</label><input type="text" name="unit" value="szt."></div>
+            <div class="form-group"><label>SKU</label><input type="text" name="sku"></div>
+            <div class="form-group"><label>EAN</label><input type="text" name="ean"></div>
+            <div class="form-group"><label>Stan minimalny</label><input type="number" name="min_quantity" value="0"></div>
+            <div class="form-group"><label>Cena zakupu</label><input type="number" step="0.01" name="purchase_price"></div>
+            <div class="form-group"><label>Cena sprzedaży</label><input type="number" step="0.01" name="sale_price"></div>
+            <div class="form-group"><label>Zdjęcie</label><input type="file" name="image" accept="image/*"></div>
+            <div class="form-group"><label>Dokument</label><input type="file" name="document" accept=".pdf,.doc,.docx,.txt,image/*"></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row"><i class="fas fa-plus"></i> Dodaj produkt</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-list"></i> Produkty w systemie</h3>
+            <span>{{ products|length }} kartotek</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nazwa</th>
+                        <th>SKU</th>
+                        <th>Kategoria</th>
+                        <th>Zakup</th>
+                        <th>Sprzedaż</th>
+                        <th>Stan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                        <tr>
+                            <td>{{ product.title }}</td>
+                            <td>{{ product.sku or '-' }}</td>
+                            <td>{{ product.category or '-' }}</td>
+                            <td>{{ "%.2f"|format(product.purchase_price or 0) }} zł</td>
+                            <td>{{ "%.2f"|format(product.sale_price or 0) }} zł</td>
+                            <td>{{ product.stock_total }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6">Brak produktów.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

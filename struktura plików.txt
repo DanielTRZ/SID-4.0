@@ -1,0 +1,11 @@
+project/
+│
+├── project.py          # Tu siedzi cała "mózgownica" (Backend)
+├── test_project.py     # Tu testujesz funkcje z project.py (Wymagane!)
+├── requirements.txt    # Lista bibliotek (np. flask, pandas, rich)
+├── database.csv        # Twoja "baza danych"
+│
+├── templates/          # (Jeśli robisz Opcję B)
+│   └── index.html      # Twój elegancki frontend
+└── static/             # (Jeśli robisz Opcję B)
+    └── style.css       # Style, żeby wszystko błyszczało

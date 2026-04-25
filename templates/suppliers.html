@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Dostawcy | SID 4.0{% endblock %}
+{% block page_title %}Dostawcy{% endblock %}
+{% block page_subtitle %}Baza firm dostarczających towar do sklepu lub hurtowni.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-building"></i> Dodaj dostawcę</h3>
+            <span>Dane potrzebne do zakupów i kontaktu</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Nazwa</label><input type="text" name="name" required></div>
+            <div class="form-group"><label>NIP</label><input type="text" name="tax_id"></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email"></div>
+            <div class="form-group"><label>Telefon</label><input type="text" name="phone"></div>
+            <div class="form-group full-row"><label>Adres</label><input type="text" name="address"></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Zapisz dostawcę</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-address-book"></i> Lista dostawców</h3>
+            <span>{{ suppliers|length }} pozycji</span>
+        </div>
+        <ul class="entity-list">
+            {% for supplier in suppliers %}
+                <li>
+                    <strong>{{ supplier.name }}</strong>
+                    <p>{{ supplier.tax_id or 'bez NIP' }} · {{ supplier.phone or 'brak telefonu' }}</p>
+                    <span>{{ supplier.email or 'brak maila' }}</span>
+                </li>
+            {% else %}
+                <li>Brak dostawców.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+{% endblock %}

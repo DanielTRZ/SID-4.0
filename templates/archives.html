@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Archiwum | SID 4.0{% endblock %}
+{% block page_title %}Archiwum raportów i backupów{% endblock %}
+{% block page_subtitle %}Rejestr wygenerowanych raportów, backupów, wydruków i eksportów.{% endblock %}
+{% block content %}
+<section class="panel-card">
+    <div class="panel-head"><h3><i class="fas fa-box-archive"></i> Archiwum plików</h3><span>Ostatnie 100 wpisów</span></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Typ</th><th>Tytuł</th><th>Plik</th><th>Data</th><th>Operator</th><th>Akcja</th></tr></thead>
+            <tbody>
+                {% for item in archives %}
+                    <tr>
+                        <td>{{ item.kind }}</td>
+                        <td>{{ item.title }}</td>
+                        <td>{{ item.file_name }}</td>
+                        <td>{{ item.created_at }}</td>
+                        <td>{{ item.user_name }}</td>
+                        <td>{% if item.file_path %}<a href="{{ url_for('archive_download', archive_id=item.id) }}" class="btn-secondary">Pobierz</a>{% else %}<span class="muted-inline">tylko wpis</span>{% endif %}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">Archiwum jest puste.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

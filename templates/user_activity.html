@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Aktywność użytkowników | SID 4.0{% endblock %}
+{% block page_title %}Historia aktywności użytkownika{% endblock %}
+{% block page_subtitle %}Kto pracował w systemie, ile wykonał akcji i kiedy ostatnio działał.{% endblock %}
+{% block content %}
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-user-clock"></i> Podsumowanie</h3><span>Akcje według użytkownika</span></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Użytkownik</th><th>Liczba akcji</th><th>Ostatnia aktywność</th></tr></thead>
+                <tbody>{% for row in activity %}<tr><td>{{ row.user_name }}</td><td>{{ row.actions_count }}</td><td>{{ row.last_action }}</td></tr>{% else %}<tr><td colspan="3">Brak aktywności.</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head"><h3><i class="fas fa-history"></i> Ostatnie wpisy audytu</h3><span>Szczegóły operacji</span></div>
+        <ul class="audit-list">{% for item in recent_audit %}<li><strong>{{ item.user_name }} · {{ item.action }}</strong><p>{{ item.details }}</p><span>{{ item.entity }} #{{ item.entity_id }} · {{ item.created_at }}</span></li>{% else %}<li><strong>Brak wpisów</strong><p>Audyt pojawi się po pierwszych działaniach.</p></li>{% endfor %}</ul>
+    </article>
+</section>
+{% endblock %}

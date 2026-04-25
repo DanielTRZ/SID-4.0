@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Alerty | SID 4.0{% endblock %}
+{% block page_title %}Centrum alertów{% endblock %}
+{% block page_subtitle %}Jedno miejsce dla braków, terminów, zdjęć i produktów bez historii dostaw.{% endblock %}
+{% block content %}
+<section class="stats-grid compact">
+    <article class="stat-card"><span>Niski stan</span><h3>{{ alert_data.counts.low_stock }}</h3></article>
+    <article class="stat-card"><span>Po terminie</span><h3>{{ alert_data.counts.expired }}</h3></article>
+    <article class="stat-card"><span>Kończące się</span><h3>{{ alert_data.counts.expiring }}</h3></article>
+    <article class="stat-card"><span>Bez ceny</span><h3>{{ alert_data.counts.missing_price }}</h3></article>
+    <article class="stat-card"><span>Bez zdjęcia</span><h3>{{ alert_data.counts.missing_image }}</h3></article>
+    <article class="stat-card"><span>Bez dostawcy</span><h3>{{ alert_data.counts.supplierless }}</h3></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card"><div class="panel-head"><h3>Niski stan</h3><span>Produkty do uzupełnienia</span></div><ul class="simple-list">{% for item in alert_data.low_stock %}<li>{{ item.title }} · {{ item.quantity_int }} / min {{ item.min_quantity_int }}</li>{% else %}<li>Brak krytycznych braków.</li>{% endfor %}</ul></article>
+    <article class="panel-card"><div class="panel-head"><h3>Po terminie i pilne</h3><span>Daty ważności</span></div><ul class="simple-list">{% for item in alert_data.expired %}<li>{{ item.title }} · po terminie {{ item.expiry_date }}</li>{% endfor %}{% for item in alert_data.expiring %}<li>{{ item.title }} · ważność {{ item.expiry_date }}</li>{% endfor %}{% if not alert_data.expired and not alert_data.expiring %}<li>Brak pilnych terminów.</li>{% endif %}</ul></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card"><div class="panel-head"><h3>Braki jakościowe</h3><span>Cena i zdjęcia</span></div><ul class="simple-list">{% for item in alert_data.missing_price %}<li>{{ item.title }} · brak ceny zakupu/sprzedaży</li>{% endfor %}{% for item in alert_data.missing_image %}<li>{{ item.title }} · brak zdjęcia</li>{% endfor %}{% if not alert_data.missing_price and not alert_data.missing_image %}<li>Brak błędów jakościowych.</li>{% endif %}</ul></article>
+    <article class="panel-card"><div class="panel-head"><h3>Bez historii dostawcy</h3><span>Warto sprawdzić źródło zakupu</span></div><ul class="simple-list">{% for item in alert_data.supplierless %}<li>{{ item.title }} {% if item.sku %}· {{ item.sku }}{% endif %}</li>{% else %}<li>Każdy produkt ma historię dostawy.</li>{% endfor %}</ul></article>
+</section>
+{% endblock %}
