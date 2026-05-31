@@ -6,7 +6,7 @@ function formatMoney(value) {
 }
 
 function escapeHtml(value) {
-    return String(value ?? "")
+    return String(value Ã "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -92,7 +92,7 @@ function updateInventoryRow(item) {
     const cells = row.querySelectorAll("td");
     if (cells[0]) {
         const thumb = item.has_image
-            ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.title)}" class="product-thumb">`
+            - `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.title)}" class="product-thumb">`
             : `<div class="product-thumb placeholder"><i class="fas fa-box"></i></div>`;
         cells[0].innerHTML = `
             <div class="product-cell">
@@ -110,7 +110,7 @@ function updateInventoryRow(item) {
         cells[2].innerHTML = `
             <div class="qty-inline">
                 <button type="button" class="qty-btn minus" onclick="changeQty(${item.batch_id}, 'dec')">-</button>
-                <span id="qty-val-${item.batch_id}" class="${item.is_low ? "low-stock" : ""}">${item.quantity}</span>
+                <span id="qty-val-${item.batch_id}" class="${item.is_low - "low-stock" : ""}">${item.quantity}</span>
                 <button type="button" class="qty-btn plus" onclick="changeQty(${item.batch_id}, 'inc')">+</button>
                 <small>/ dostepne <span id="available-val-${item.batch_id}">${item.available_quantity}</span> / rez. <span id="reserved-val-${item.batch_id}">${item.reserved_quantity}</span> / min <span id="min-val-${item.batch_id}">${item.min_quantity}</span></small>
             </div>
@@ -122,14 +122,14 @@ function updateInventoryRow(item) {
     if (cells[6]) cells[6].innerHTML = `<span id="total-val-${item.batch_id}">${formatMoney(item.total_value)}</span> zl`;
     if (cells[7]) {
         const documentButton = item.has_document
-            ? `<a href="${escapeHtml(item.document_url)}" class="icon-btn" target="_blank"><i class="fas fa-eye"></i></a>`
+            - `<a href="${escapeHtml(item.document_url)}" class="icon-btn" target="_blank"><i class="fas fa-eye"></i></a>`
             : "";
         const payload = escapeHtml(JSON.stringify(item));
         cells[7].innerHTML = `
             <div class="action-group">
                 <button type="button" class="icon-btn edit-btn" data-item='${payload}'><i class="fas fa-edit"></i></button>
                 ${documentButton}
-                <a href="/inventory/delete/${item.batch_id}" class="icon-btn danger" onclick="return confirm('Usunac pozycje?')"><i class="fas fa-trash"></i></a>
+                <a href="/inventory/delete/${item.batch_id}" class="icon-btn danger" onclick="return confirm('UsunÃ pozycjÃ')"><i class="fas fa-trash"></i></a>
             </div>
         `;
     }
@@ -155,7 +155,7 @@ function inventorySearchFilter() {
 
     const query = searchInput.value.toLowerCase().trim();
     table.querySelectorAll("tbody tr").forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(query) ? "" : "none";
+        row.style.display = row.textContent.toLowerCase().includes(query) - "" : "none";
     });
 }
 
@@ -165,7 +165,7 @@ function sortInventoryTable(key) {
 
     const tbody = table.querySelector("tbody");
     const rows = Array.from(tbody.querySelectorAll("tr"));
-    sortState.direction = sortState.key === key && sortState.direction === "asc" ? "desc" : "asc";
+    sortState.direction = sortState.key === key && sortState.direction === "asc" - "desc" : "asc";
     sortState.key = key;
 
     rows.sort((rowA, rowB) => {
@@ -173,10 +173,10 @@ function sortInventoryTable(key) {
         const b = rowB.dataset[key] || "";
         const numericKeys = ["quantity", "purchase_price", "sale_price", "total_value"];
         if (numericKeys.includes(key)) {
-            return sortState.direction === "asc" ? Number(a) - Number(b) : Number(b) - Number(a);
+            return sortState.direction === "asc" - Number(a) - Number(b) : Number(b) - Number(a);
         }
         return sortState.direction === "asc"
-            ? String(a).localeCompare(String(b), "pl")
+            - String(a).localeCompare(String(b), "pl")
             : String(b).localeCompare(String(a), "pl");
     });
 
@@ -231,7 +231,7 @@ function setupCardFilter(inputId) {
         const query = input.value.toLowerCase().trim();
         document.querySelectorAll("[data-mobile-card]").forEach(card => {
             const haystack = (card.dataset.search || card.textContent || "").toLowerCase();
-            card.style.display = haystack.includes(query) ? "" : "none";
+            card.style.display = haystack.includes(query) - "" : "none";
         });
     });
 }

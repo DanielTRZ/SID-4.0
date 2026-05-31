@@ -1,7 +1,44 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Inwentaryzacja | SID 4.0{% endblock %}
 {% block page_title %}Inwentaryzacja z natury{% endblock %}
 {% block page_subtitle %}Tworzenie spisów z natury, wpisywanie stanów rzeczywistych i zamykanie różnic.{% endblock %}
 {% block content %}
-<section class="grid-two"><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-clipboard-check"></i> Nowy spis</h3><span>Wybierz magazyn i rozpocznij liczenie</span></div><form method="POST" class="form-grid"><div class="form-group"><label>Nazwa</label><input type="text" name="name" placeholder="np. Spis maj 2026"></div><div class="form-group"><label>Magazyn</label><select name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select></div><div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4"></textarea></div><button type="submit" class="btn-submit full-row">Utwórz inwentaryzację</button></form></article><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-list"></i> Spisy</h3><span>Dotychczasowe inwentaryzacje</span></div><div class="table-wrap"><table><thead><tr><th>Nazwa</th><th>Magazyn</th><th>Status</th><th>Data</th><th>Akcja</th></tr></thead><tbody>{% for stocktake in stocktakes %}<tr><td>{{ stocktake.name }}</td><td>{{ stocktake.warehouse_name }}</td><td>{{ stocktake.status }}</td><td>{{ stocktake.created_at }}</td><td><a href="{{ url_for('stocktake_detail', stocktake_id=stocktake.id) }}" class="btn-secondary">Otwórz</a></td></tr>{% else %}<tr><td colspan="5">Brak spisów z natury.</td></tr>{% endfor %}</tbody></table></div></article></section>
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-clipboard-check"></i> Nowy spis</h3>
+            <span>Wybierz magazyn i rozpocznij liczenie</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group"><label>Nazwa</label><input type="text" name="name" placeholder="np. Spis maj 2026"></div>
+            <div class="form-group"><label>Magazyn</label><select name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select></div>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="4" placeholder="Opcjonalna notatka do spisu"></textarea></div>
+            <button type="submit" class="btn-submit full-row">Utwórz inwentaryzację</button>
+        </form>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-list"></i> Spisy</h3>
+            <span>Dotychczasowe inwentaryzacje</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Nazwa</th><th>Magazyn</th><th>Status</th><th>Data</th><th>Akcja</th></tr></thead>
+                <tbody>
+                    {% for stocktake in stocktakes %}
+                        <tr>
+                            <td>{{ stocktake.name }}</td>
+                            <td>{{ stocktake.warehouse_name }}</td>
+                            <td><span class="badge badge-neutral">{{ stocktake.status }}</span></td>
+                            <td>{{ stocktake.created_at }}</td>
+                            <td><div class="inline-actions"><a href="{{ url_for('stocktake_detail', stocktake_id=stocktake.id) }}" class="btn-secondary">Otwórz</a><a href="{{ url_for('stocktake_mobile', stocktake_id=stocktake.id) }}" class="icon-btn"><i class="fas fa-mobile-screen"></i></a></div></td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5">Brak spisów z natury.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
 {% endblock %}

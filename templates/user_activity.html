@@ -1,21 +1,65 @@
 {% extends "base.html" %}
-{% block title %}Aktywność użytkowników | SID 4.0{% endblock %}
-{% block page_title %}Historia aktywności użytkownika{% endblock %}
-{% block page_subtitle %}Kto pracował w systemie, ile wykonał akcji i kiedy ostatnio działał.{% endblock %}
+{% block title %}{{ tr("Aktywność użytkowników", "User activity") }} | SID 4.0{% endblock %}
+{% block page_title %}{{ tr("Historia aktywności użytkownika", "User activity history") }}{% endblock %}
+{% block page_subtitle %}{{ tr("Kto pracował w systemie, ile wykonał akcji i jakie stany były przed oraz po operacji.", "Who worked in the system, how many actions were done and what changed before and after operations.") }}{% endblock %}
 {% block content %}
+<section class="feature-strip">
+    <article class="feature-chip"><span>{{ tr("Audyt", "Audit") }}</span><strong>{{ tr("Stan przed / po", "Before / after state") }}</strong></article>
+    <article class="feature-chip"><span>{{ tr("Typy wpisów", "Entry types") }}</span><strong>{{ tr("Zmiany i cofnięcia", "Changes and reversals") }}</strong></article>
+    <article class="feature-chip"><span>{{ tr("Cel", "Goal") }}</span><strong>{{ tr("Pełniejsza kontrola działań", "Fuller control of actions") }}</strong></article>
+</section>
+
 <section class="grid-two">
     <article class="panel-card">
-        <div class="panel-head"><h3><i class="fas fa-user-clock"></i> Podsumowanie</h3><span>Akcje według użytkownika</span></div>
+        <div class="panel-head">
+            <h3><i class="fas fa-user-clock"></i> {{ tr("Podsumowanie", "Summary") }}</h3>
+            <span>{{ tr("Akcje według użytkownika", "Actions by user") }}</span>
+        </div>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Użytkownik</th><th>Liczba akcji</th><th>Ostatnia aktywność</th></tr></thead>
-                <tbody>{% for row in activity %}<tr><td>{{ row.user_name }}</td><td>{{ row.actions_count }}</td><td>{{ row.last_action }}</td></tr>{% else %}<tr><td colspan="3">Brak aktywności.</td></tr>{% endfor %}</tbody>
+                <thead><tr><th>{{ tr("Użytkownik", "User") }}</th><th>{{ tr("Liczba akcji", "Number of actions") }}</th><th>{{ tr("Ostatnia aktywność", "Last activity") }}</th></tr></thead>
+                <tbody>
+                    {% for row in activity %}
+                        <tr><td>{{ row.user_name }}</td><td>{{ row.actions_count }}</td><td>{{ row.last_action }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3">{{ tr("Brak aktywności.", "No activity.") }}</td></tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
     </article>
+
     <article class="panel-card">
-        <div class="panel-head"><h3><i class="fas fa-history"></i> Ostatnie wpisy audytu</h3><span>Szczegóły operacji</span></div>
-        <ul class="audit-list">{% for item in recent_audit %}<li><strong>{{ item.user_name }} · {{ item.action }}</strong><p>{{ item.details }}</p><span>{{ item.entity }} #{{ item.entity_id }} · {{ item.created_at }}</span></li>{% else %}<li><strong>Brak wpisów</strong><p>Audyt pojawi się po pierwszych działaniach.</p></li>{% endfor %}</ul>
+        <div class="panel-head">
+            <h3><i class="fas fa-history"></i> {{ tr("Ostatnie wpisy audytu", "Latest audit entries") }}</h3>
+            <span>{{ tr("Szczegóły operacji i cofnięć", "Operation and reversal details") }}</span>
+        </div>
+        <ul class="audit-list audit-list-detailed">
+            {% for item in recent_audit %}
+                <li>
+                    <div class="audit-head-row">
+                        <strong>{{ item.user_name }} - {{ item.action }}</strong>
+                        <span class="badge {% if item.action == 'reverse' %}badge-warning-soft{% else %}badge-neutral{% endif %}">{{ item.entity }} #{{ item.entity_id }}</span>
+                    </div>
+                    <p>{{ item.details }}</p>
+                    <span>{{ item.created_at }}</span>
+                    {% if item.before_state or item.after_state %}
+                        <div class="audit-state-grid">
+                            <div class="audit-state-card">
+                                <label>{{ tr("Przed zmianą", "Before change") }}</label>
+                                <code>{{ item.before_state or tr("Brak zapisanego stanu.", "No saved state.") }}</code>
+                            </div>
+                            <div class="audit-state-card">
+                                <label>{{ tr("Po zmianie", "After change") }}</label>
+                                <code>{{ item.after_state or tr("Brak zapisanego stanu.", "No saved state.") }}</code>
+                            </div>
+                        </div>
+                    {% endif %}
+                </li>
+            {% else %}
+                <li><strong>{{ tr("Brak wpisów", "No entries") }}</strong><p>{{ tr("Audyt pojawi się po pierwszych działaniach.", "Audit will appear after the first actions.") }}</p></li>
+            {% endfor %}
+        </ul>
     </article>
 </section>
 {% endblock %}

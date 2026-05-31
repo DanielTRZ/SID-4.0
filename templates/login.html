@@ -1,17 +1,20 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="{{ current_language }}" data-app-lang="{{ current_language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logowanie | SID 4.0</title>
+    <title>{{ tr("Logowanie", "Login") }} | SID 4.0</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="login-page">
+<body class="login-page" data-app-lang="{{ current_language }}">
     <section class="login-card">
         <div class="brand-block centered">
             <h1>SID 4.0</h1>
-            <p>System dla sklepu, magazynu i sprzedaży</p>
+            <p>{{ tr("System dla sklepu, magazynu i sprzedaży", "System for store, warehouse and sales") }}</p>
+        </div>
+        <div class="login-language">
+            <a href="{{ url_for('set_language', lang=opposite_language, next=request.full_path) }}" class="language-toggle"><i class="fas fa-language"></i> {{ opposite_language|upper }}</a>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,15 +33,16 @@
                 <input type="text" name="username" placeholder="admin" required>
             </div>
             <div class="form-group">
-                <label>Hasło</label>
+                <label>{{ tr("Hasło", "Password") }}</label>
                 <input type="password" name="password" placeholder="admin123" required>
             </div>
-            <button type="submit" class="btn-submit"><i class="fas fa-right-to-bracket"></i> Zaloguj</button>
+            <button type="submit" class="btn-submit"><i class="fas fa-right-to-bracket"></i> {{ tr("Zaloguj", "Log in") }}</button>
         </form>
 
         <div class="login-help">
-            <strong>Start:</strong> konto domyślne to `admin` / `admin123`
+            <strong>Start:</strong> {{ tr("konto domyślne to", "default account is") }} `admin` / `admin123`
         </div>
     </section>
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
 </body>
 </html>

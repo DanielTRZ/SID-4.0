@@ -1,8 +1,110 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Dashboard właściciela | SID 4.0{% endblock %}
 {% block page_title %}Dashboard właściciela{% endblock %}
-{% block page_subtitle %}Wysoki poziom kontroli nad sprzedażą, marżą, zadaniami i ryzykami magazynowymi.{% endblock %}
+{% block page_subtitle %}Widok marży, ryzyk i jakości sprzedaży bez ruszania działających modułów sklepu i magazynu.{% endblock %}
 {% block content %}
-<section class="stats-grid"><article class="stat-card"><span>Sprzedaż dziś</span><h3>{{ "%.2f"|format(metrics.sales_today) }} zł</h3></article><article class="stat-card"><span>Szacowana marża</span><h3>{{ "%.2f"|format(metrics.estimated_margin) }} zł</h3></article><article class="stat-card"><span>Martwy magazyn</span><h3>{{ metrics.dead_stock_count }}</h3></article><article class="stat-card"><span>Zarezerwowane sztuki</span><h3>{{ metrics.reserved_units }}</h3></article><article class="stat-card"><span>Otwarte zadania</span><h3>{{ metrics.open_tasks_count }}</h3></article><article class="stat-card"><span>Otwarte zamówienia</span><h3>{{ metrics.open_orders }}</h3></article></section>
-<section class="panel-card"><div class="panel-head"><h3><i class="fas fa-compass"></i> Szybka interpretacja</h3><span>Na co zwrócić uwagę</span></div><ul class="simple-list"><li>Wartość magazynu: {{ "%.2f"|format(metrics.inventory.total_value) }} zł</li><li>Niski stan: {{ metrics.inventory.low_stock_count }} pozycji</li><li>Po terminie: {{ metrics.inventory.expired_count }} pozycji</li><li>Brak ceny: {{ metrics.inventory.missing_price_count }} pozycji</li></ul></section>
+<section class="feature-strip">
+    <article class="feature-chip"><span>Łączna marża</span><strong>{{ "%.2f"|format(metrics.estimated_margin) }} zł</strong></article>
+    <article class="feature-chip"><span>Łączna sprzedaż</span><strong>{{ "%.2f"|format(metrics.sales_total_all) }} zł</strong></article>
+    <article class="feature-chip"><span>Łączny koszt</span><strong>{{ "%.2f"|format(metrics.purchase_total_all) }} zł</strong></article>
+    <article class="feature-chip"><span>Sprzedaże policzone</span><strong>{{ metrics.sales_count }}</strong></article>
+</section>
+<section class="stats-grid">
+    <article class="stat-card"><span>Sprzedaż dziś</span><h3>{{ "%.2f"|format(metrics.sales_today) }} zł</h3></article>
+    <article class="stat-card"><span>Marża dziś</span><h3>{{ "%.2f"|format(metrics.today_margin) }} zł</h3><small>{{ "%.2f"|format(metrics.today_margin_percent) }}%</small></article>
+    <article class="stat-card"><span>Szacowana marża łącznie</span><h3>{{ "%.2f"|format(metrics.estimated_margin) }} zł</h3></article>
+    <article class="stat-card"><span>Marża łączna %</span><h3>{{ "%.2f"|format(metrics.margin_percent) }}%</h3></article>
+    <article class="stat-card"><span>Średnia marża / sprzedaż</span><h3>{{ "%.2f"|format(metrics.average_margin_per_sale) }} zł</h3></article>
+    <article class="stat-card"><span>Cofnięte sprzedaże</span><h3>{{ metrics.reversed_sales_count }}</h3></article>
+    <article class="stat-card"><span>Zarezerwowane sztuki</span><h3>{{ metrics.reserved_units }}</h3></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-chart-line"></i> Marża w ostatnich 7 dniach</h3>
+            <span>Sprzedaż, koszt i wynik dzienny.</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Dzień</th><th>Sprzedaż</th><th>Koszt zakupu</th><th>Marża</th><th>Marża %</th></tr></thead>
+                <tbody>
+                    {% for day in metrics.margin_by_day %}
+                        <tr>
+                            <td>{{ day.sale_day }}</td>
+                            <td>{{ "%.2f"|format(day.sales_total) }} zł</td>
+                            <td>{{ "%.2f"|format(day.purchase_total) }} zł</td>
+                            <td>{{ "%.2f"|format(day.margin_total) }} zł</td>
+                            <td>{{ "%.2f"|format(day.margin_percent) }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5">Brak sprzedaży w ostatnich 7 dniach.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-crown"></i> Najlepsze produkty marżowe</h3>
+            <span>Produkty, które generują najwyższy wynik.</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Produkt</th><th>Sztuki</th><th>Sprzedaż</th><th>Marża</th><th>Marża %</th></tr></thead>
+                <tbody>
+                    {% for row in metrics.top_margin_products %}
+                        <tr>
+                            <td>{{ row.title }}</td>
+                            <td>{{ row.units_sold }}</td>
+                            <td>{{ "%.2f"|format(row.sales_total) }} zł</td>
+                            <td>{{ "%.2f"|format(row.margin_total) }} zł</td>
+                            <td>{{ "%.2f"|format(row.margin_percent) }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5">Brak danych sprzedażowych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-triangle-exclamation"></i> Produkty z najsłabszą marżą</h3>
+            <span>Warto je sprawdzić pod kątem ceny lub kosztu zakupu.</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Produkt</th><th>Sztuki</th><th>Sprzedaż</th><th>Marża</th><th>Marża %</th></tr></thead>
+                <tbody>
+                    {% for row in metrics.low_margin_products %}
+                        <tr>
+                            <td>{{ row.title }}</td>
+                            <td>{{ row.units_sold }}</td>
+                            <td>{{ "%.2f"|format(row.sales_total) }} zł</td>
+                            <td>{{ "%.2f"|format(row.margin_total) }} zł</td>
+                            <td>{{ "%.2f"|format(row.margin_percent) }}%</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5">Brak danych do oceny marży.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-compass"></i> Najważniejsze punkty dla właściciela</h3>
+            <span>Szybka interpretacja danych.</span>
+        </div>
+        <ul class="simple-list">
+            <li>Łączna sprzedaż z policzoną marżą: {{ "%.2f"|format(metrics.sales_total_all) }} zł</li>
+            <li>Łączny koszt zakupu sprzedanych towarów: {{ "%.2f"|format(metrics.purchase_total_all) }} zł</li>
+            <li>Wartość magazynu: {{ "%.2f"|format(metrics.inventory.total_value) }} zł</li>
+            <li>Brak ceny: {{ metrics.inventory.missing_price_count }} pozycji</li>
+            <li>Otwarte zamówienia: {{ metrics.open_orders }}</li>
+        </ul>
+    </article>
+</section>
 {% endblock %}

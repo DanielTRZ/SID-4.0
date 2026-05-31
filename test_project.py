@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 
 import project
 
@@ -38,18 +39,19 @@ class SidSystemTestCase(unittest.TestCase):
             self.client = None
         except Exception:
             pass
+        self.temp_dir.cleanup()
 
     def login(self):
         return self.client.post("/login", data={"username": "admin", "password": "admin123"}, follow_redirects=True)
 
     def db_one(self, query, params=()):
-        with sqlite3.connect(project.DATABASE) as connection:
+        with closing(sqlite3.connect(project.DATABASE)) as connection:
             connection.row_factory = sqlite3.Row
             row = connection.execute(query, params).fetchone()
             return dict(row) if row else None
 
     def db_all(self, query, params=()):
-        with sqlite3.connect(project.DATABASE) as connection:
+        with closing(sqlite3.connect(project.DATABASE)) as connection:
             connection.row_factory = sqlite3.Row
             return [dict(row) for row in connection.execute(query, params).fetchall()]
 
@@ -110,6 +112,52 @@ class SidSystemTestCase(unittest.TestCase):
         self.assertEqual(finalize_response.status_code, 200)
         self.assertEqual(self.db_one("SELECT quantity FROM stock_batches WHERE id = ?", (batch["id"],))["quantity"], 5)
         self.assertEqual(self.db_one("SELECT status FROM stocktakes WHERE id = ?", (stocktake['id'],))["status"], "closed")
+
+    def test_pos_scanner_adds_product_by_ean_to_cart(self):
+        self.add_inventory_item(title="Herbata", quantity="7", sale_price="8.50")
+        response = self.client.post("/sales/cart/scan", data={"scan_code": "EAN-Herbata", "quantity": "2"}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as session:
+            cart = session.get("pos_cart", [])
+        self.assertEqual(len(cart), 1)
+        self.assertEqual(cart[0]["quantity"], 2)
+        batch = self.db_one("SELECT id FROM stock_batches")
+        self.assertEqual(cart[0]["batch_id"], batch["id"])
+
+    def test_reverse_sale_restores_stock_and_marks_audit(self):
+        self.add_inventory_item(title="Kawa", quantity="6", sale_price="12.00")
+        batch = self.db_one("SELECT id FROM stock_batches")
+        self.client.post("/sales/cart/add", data={"batch_id": str(batch["id"]), "quantity": "2", "unit_price": "12.00", "discount_percent": "0"}, follow_redirects=True)
+        self.client.post("/sales/checkout", data={"payment_method": "cash"}, follow_redirects=True)
+        sale = self.db_one("SELECT id, status FROM sales ORDER BY id DESC LIMIT 1")
+        self.assertEqual(self.db_one("SELECT quantity FROM stock_batches WHERE id = ?", (batch["id"],))["quantity"], 4)
+
+        response = self.client.post(f"/sales/{sale['id']}/reverse", data={"reason": "test cofniecia"}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.db_one("SELECT quantity FROM stock_batches WHERE id = ?", (batch["id"],))["quantity"], 6)
+        reversed_sale = self.db_one("SELECT status, reverse_reason FROM sales WHERE id = ?", (sale["id"],))
+        self.assertEqual(reversed_sale["status"], "reversed")
+        self.assertEqual(reversed_sale["reverse_reason"], "test cofniecia")
+        audit = self.db_one("SELECT action, entity, before_state, after_state FROM audit_log WHERE entity = 'sale' AND entity_id = ? ORDER BY id DESC LIMIT 1", (str(sale["id"]),))
+        self.assertEqual(audit["action"], "reverse")
+        self.assertIn("status=completed", audit["before_state"])
+        self.assertIn("status=reversed", audit["after_state"])
+
+    def test_reverse_manual_movement_restores_quantity(self):
+        self.add_inventory_item(title="Ry?", quantity="10", sale_price="5.00")
+        batch = self.db_one("SELECT id FROM stock_batches")
+        self.client.post("/movements", data={"batch_id": str(batch["id"]), "movement_type": "adjustment_out", "quantity": "3", "notes": "test korekty"}, follow_redirects=True)
+        movement = self.db_one("SELECT id, movement_type FROM stock_movements WHERE movement_type = 'adjustment_out' ORDER BY id DESC LIMIT 1")
+        self.assertEqual(self.db_one("SELECT quantity FROM stock_batches WHERE id = ?", (batch["id"],))["quantity"], 7)
+
+        response = self.client.post(f"/movements/{movement['id']}/reverse", data={"reason": "bledna korekta"}, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.db_one("SELECT quantity FROM stock_batches WHERE id = ?", (batch["id"],))["quantity"], 10)
+        reversed_move = self.db_one("SELECT reversed_at, reverse_reason FROM stock_movements WHERE id = ?", (movement["id"],))
+        self.assertTrue(reversed_move["reversed_at"])
+        self.assertEqual(reversed_move["reverse_reason"], "bledna korekta")
+        reverse_log = self.db_one("SELECT movement_type FROM stock_movements WHERE reference_type = 'movement_reversal' AND reference_id = ? ORDER BY id DESC LIMIT 1", (str(movement["id"]),))
+        self.assertEqual(reverse_log["movement_type"], "adjustment_out_reversal")
 
     def test_users_settings_create_user_and_save_company_name(self):
         self.login()

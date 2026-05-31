@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="pl">
+<html lang="{{ current_language }}" data-app-lang="{{ current_language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,56 +8,58 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="app-shell">
+<body class="app-shell" data-app-lang="{{ current_language }}">
     <aside class="sidebar">
         <div class="brand-block">
             <h1>SID 4.0</h1>
-            <p>Sklep + magazyn + sprzedaż</p>
+            <p>{{ tr("Sklep + magazyn + sprzedaż", "Store + warehouse + sales") }}</p>
         </div>
         <nav class="sidebar-nav">
             <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fas fa-gauge-high"></i> Dashboard</a>
-            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('owner_dashboard') }}" class="{% if request.endpoint == 'owner_dashboard' %}active{% endif %}"><i class="fas fa-chart-line"></i> Dashboard właściciela</a>{% endif %}
-            <a href="{{ url_for('inventory') }}" class="{% if request.endpoint in ['inventory', 'add_inventory', 'edit_inventory'] %}active{% endif %}"><i class="fas fa-warehouse"></i> Magazyn</a>
-            <a href="{{ url_for('mobile_view') }}" class="{% if request.endpoint == 'mobile_view' %}active{% endif %}"><i class="fas fa-mobile-screen"></i> Tryb mobilny</a>
-            <a href="{{ url_for('products') }}" class="{% if request.endpoint == 'products' %}active{% endif %}"><i class="fas fa-box-open"></i> Produkty</a>
-            <a href="{{ url_for('sales') }}" class="{% if request.endpoint == 'sales' %}active{% endif %}"><i class="fas fa-cash-register"></i> Sprzedaż</a>
-            <a href="{{ url_for('documents') }}" class="{% if request.endpoint in ['documents', 'document_detail', 'document_pdf'] %}active{% endif %}"><i class="fas fa-file-invoice"></i> Dokumenty</a>
-            <a href="{{ url_for('purchases') }}" class="{% if request.endpoint == 'purchases' %}active{% endif %}"><i class="fas fa-truck-loading"></i> Zakupy</a>
-            <a href="{{ url_for('stocktakes') }}" class="{% if request.endpoint in ['stocktakes', 'stocktake_detail', 'stocktake_mobile', 'stocktake_finalize'] %}active{% endif %}"><i class="fas fa-clipboard-check"></i> Inwentaryzacja</a>
-            <a href="{{ url_for('movements') }}" class="{% if request.endpoint == 'movements' %}active{% endif %}"><i class="fas fa-right-left"></i> Ruchy</a>
-            <a href="{{ url_for('customers') }}" class="{% if request.endpoint == 'customers' %}active{% endif %}"><i class="fas fa-users"></i> Klienci</a>
-            <a href="{{ url_for('suppliers') }}" class="{% if request.endpoint == 'suppliers' %}active{% endif %}"><i class="fas fa-building"></i> Dostawcy</a>
-            {% if current_user and current_user['role'] == 'admin' %}<a href="{{ url_for('users_settings') }}" class="{% if request.endpoint == 'users_settings' %}active{% endif %}"><i class="fas fa-user-gear"></i> Użytkownicy i ustawienia</a>{% endif %}
-            <div class="sidebar-divider">Dodatki</div>
-            <a href="{{ url_for('alerts') }}" class="{% if request.endpoint == 'alerts' %}active{% endif %}"><i class="fas fa-bell"></i> Alerty</a>
-            <a href="{{ url_for('calendar_view') }}" class="{% if request.endpoint == 'calendar_view' %}active{% endif %}"><i class="fas fa-calendar-days"></i> Kalendarz</a>
-            <a href="{{ url_for('prints') }}" class="{% if request.endpoint in ['prints', 'print_labels'] %}active{% endif %}"><i class="fas fa-print"></i> Etykiety i wydruki</a>
-            <a href="{{ url_for('notes') }}" class="{% if request.endpoint == 'notes' %}active{% endif %}"><i class="fas fa-note-sticky"></i> Notatki</a>
-            <a href="{{ url_for('attachments') }}" class="{% if request.endpoint == 'attachments' %}active{% endif %}"><i class="fas fa-paperclip"></i> Załączniki</a>
-            <a href="{{ url_for('data_quality') }}" class="{% if request.endpoint == 'data_quality' %}active{% endif %}"><i class="fas fa-shield-check"></i> Jakość danych</a>
-            <a href="{{ url_for('tasks_view') }}" class="{% if request.endpoint in ['tasks_view', 'task_done'] %}active{% endif %}"><i class="fas fa-list-check"></i> Zadania</a>
-            <a href="{{ url_for('archives') }}" class="{% if request.endpoint in ['archives', 'archive_download'] %}active{% endif %}"><i class="fas fa-box-archive"></i> Archiwum</a>
-            <a href="{{ url_for('dictionaries') }}" class="{% if request.endpoint == 'dictionaries' %}active{% endif %}"><i class="fas fa-book"></i> Słowniki</a>
-            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('user_activity') }}" class="{% if request.endpoint == 'user_activity' %}active{% endif %}"><i class="fas fa-user-clock"></i> Aktywność użytkowników</a>{% endif %}
-            <a href="{{ url_for('reservations_view') }}" class="{% if request.endpoint in ['reservations_view', 'reservation_release'] %}active{% endif %}"><i class="fas fa-bookmark"></i> Rezerwacje</a>
-            <a href="{{ url_for('demo') }}" class="{% if request.endpoint in ['demo', 'demo_toggle'] %}active{% endif %}"><i class="fas fa-flask"></i> Tryb demo</a>
-            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('manager_exports') }}" class="{% if request.endpoint in ['manager_exports', 'manager_export_file'] %}active{% endif %}"><i class="fas fa-file-lines"></i> Eksporty menedżerskie</a>{% endif %}
+            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('owner_dashboard') }}" class="{% if request.endpoint == 'owner_dashboard' %}active{% endif %}"><i class="fas fa-chart-line"></i> {{ tr("Dashboard właściciela", "Owner dashboard") }}</a>{% endif %}
+            <a href="{{ url_for('inventory') }}" class="{% if request.endpoint in ['inventory', 'add_inventory', 'edit_inventory'] %}active{% endif %}"><i class="fas fa-warehouse"></i> {{ tr("Magazyn", "Inventory") }}</a>
+            <a href="{{ url_for('mobile_view') }}" class="{% if request.endpoint == 'mobile_view' %}active{% endif %}"><i class="fas fa-mobile-screen"></i> {{ tr("Tryb mobilny", "Mobile mode") }}</a>
+            <a href="{{ url_for('products') }}" class="{% if request.endpoint == 'products' %}active{% endif %}"><i class="fas fa-box-open"></i> {{ tr("Produkty", "Products") }}</a>
+            <a href="{{ url_for('sales') }}" class="{% if request.endpoint == 'sales' %}active{% endif %}"><i class="fas fa-cash-register"></i> {{ tr("Sprzedaż", "Sales") }}</a>
+            <a href="{{ url_for('documents') }}" class="{% if request.endpoint in ['documents', 'document_detail', 'document_pdf'] %}active{% endif %}"><i class="fas fa-file-invoice"></i> {{ tr("Dokumenty", "Documents") }}</a>
+            <a href="{{ url_for('purchases') }}" class="{% if request.endpoint == 'purchases' %}active{% endif %}"><i class="fas fa-truck-loading"></i> {{ tr("Zakupy", "Purchases") }}</a>
+            <a href="{{ url_for('stocktakes') }}" class="{% if request.endpoint in ['stocktakes', 'stocktake_detail', 'stocktake_mobile', 'stocktake_finalize'] %}active{% endif %}"><i class="fas fa-clipboard-check"></i> {{ tr("Inwentaryzacja", "Stocktake") }}</a>
+            <a href="{{ url_for('movements') }}" class="{% if request.endpoint == 'movements' %}active{% endif %}"><i class="fas fa-right-left"></i> {{ tr("Ruchy", "Movements") }}</a>
+            <a href="{{ url_for('customers') }}" class="{% if request.endpoint == 'customers' %}active{% endif %}"><i class="fas fa-users"></i> {{ tr("Klienci", "Customers") }}</a>
+            <a href="{{ url_for('suppliers') }}" class="{% if request.endpoint == 'suppliers' %}active{% endif %}"><i class="fas fa-building"></i> {{ tr("Dostawcy", "Suppliers") }}</a>
+            {% if current_user and current_user['role'] == 'admin' %}<a href="{{ url_for('users_settings') }}" class="{% if request.endpoint == 'users_settings' %}active{% endif %}"><i class="fas fa-user-gear"></i> {{ tr("Użytkownicy i ustawienia", "Users and settings") }}</a>{% endif %}
+            <div class="sidebar-divider">{{ tr("Dodatki", "Add-ons") }}</div>
+            <a href="{{ url_for('alerts') }}" class="{% if request.endpoint == 'alerts' %}active{% endif %}"><i class="fas fa-bell"></i> {{ tr("Alerty", "Alerts") }}</a>
+            <a href="{{ url_for('calendar_view') }}" class="{% if request.endpoint == 'calendar_view' %}active{% endif %}"><i class="fas fa-calendar-days"></i> {{ tr("Kalendarz", "Calendar") }}</a>
+            <a href="{{ url_for('prints') }}" class="{% if request.endpoint in ['prints', 'print_labels'] %}active{% endif %}"><i class="fas fa-print"></i> {{ tr("Etykiety i wydruki", "Labels and prints") }}</a>
+            <a href="{{ url_for('notes') }}" class="{% if request.endpoint == 'notes' %}active{% endif %}"><i class="fas fa-note-sticky"></i> {{ tr("Notatki", "Notes") }}</a>
+            <a href="{{ url_for('attachments') }}" class="{% if request.endpoint == 'attachments' %}active{% endif %}"><i class="fas fa-paperclip"></i> {{ tr("Załączniki", "Attachments") }}</a>
+            <a href="{{ url_for('data_quality') }}" class="{% if request.endpoint == 'data_quality' %}active{% endif %}"><i class="fas fa-shield-check"></i> {{ tr("Jakość danych", "Data quality") }}</a>
+            <a href="{{ url_for('tasks_view') }}" class="{% if request.endpoint in ['tasks_view', 'task_done'] %}active{% endif %}"><i class="fas fa-list-check"></i> {{ tr("Zadania", "Tasks") }}</a>
+            <a href="{{ url_for('archives') }}" class="{% if request.endpoint in ['archives', 'archive_download'] %}active{% endif %}"><i class="fas fa-box-archive"></i> {{ tr("Archiwum", "Archive") }}</a>
+            <a href="{{ url_for('dictionaries') }}" class="{% if request.endpoint == 'dictionaries' %}active{% endif %}"><i class="fas fa-book"></i> {{ tr("Słowniki", "Dictionaries") }}</a>
+            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('user_activity') }}" class="{% if request.endpoint == 'user_activity' %}active{% endif %}"><i class="fas fa-user-clock"></i> {{ tr("Aktywność użytkowników", "User activity") }}</a>{% endif %}
+            <a href="{{ url_for('reservations_view') }}" class="{% if request.endpoint in ['reservations_view', 'reservation_release'] %}active{% endif %}"><i class="fas fa-bookmark"></i> {{ tr("Rezerwacje", "Reservations") }}</a>
+            <a href="{{ url_for('demo') }}" class="{% if request.endpoint in ['demo', 'demo_toggle'] %}active{% endif %}"><i class="fas fa-flask"></i> {{ tr("Tryb demo", "Demo mode") }}</a>
+            {% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('manager_exports') }}" class="{% if request.endpoint in ['manager_exports', 'manager_export_file'] %}active{% endif %}"><i class="fas fa-file-lines"></i> {{ tr("Eksporty menedżerskie", "Manager exports") }}</a>{% endif %}
         </nav>
         <div class="sidebar-footer">
-            <div><strong>{{ current_user['full_name'] if current_user else 'Gość' }}</strong><p>{{ current_user['role'] if current_user else '' }}</p></div>
-            <a href="{{ url_for('logout') }}" class="logout-link"><i class="fas fa-sign-out-alt"></i> Wyloguj</a>
+            <div><strong>{{ current_user['full_name'] if current_user else tr('Gość', 'Guest') }}</strong><p>{{ current_user['role'] if current_user else '' }}</p></div>
+            <a href="{{ url_for('set_language', lang=opposite_language, next=request.full_path) }}" class="language-toggle"><i class="fas fa-language"></i> {{ opposite_language|upper }}</a>
+            <a href="{{ url_for('logout') }}" class="logout-link"><i class="fas fa-sign-out-alt"></i> {{ tr("Wyloguj", "Log out") }}</a>
         </div>
     </aside>
     <main class="main-area">
         <header class="topbar">
             <div><h2>{% block page_title %}{% endblock %}</h2><p>{% block page_subtitle %}{% endblock %}</p></div>
-            <div class="topbar-actions"><a href="{{ url_for('inventory_report') }}" class="btn-secondary"><i class="fas fa-file-pdf"></i> Raport PDF</a>{% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('backup') }}" class="btn-success"><i class="fas fa-database"></i> Backup</a>{% endif %}</div>
+            <div class="topbar-actions"><a href="{{ url_for('set_language', lang=opposite_language, next=request.full_path) }}" class="btn-secondary language-toggle"><i class="fas fa-language"></i> {{ opposite_language|upper }}</a><a href="{{ url_for('inventory_report') }}" class="btn-secondary"><i class="fas fa-file-pdf"></i> {{ tr("Raport PDF", "PDF report") }}</a>{% if current_user and current_user['role'] in ['admin', 'manager'] %}<a href="{{ url_for('backup') }}" class="btn-success"><i class="fas fa-database"></i> Backup</a>{% endif %}</div>
         </header>
         {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-stack">{% for category, message in messages %}<div class="flash flash-{{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
-        {% if demo_mode %}<div class="flash flash-info">Tryb demo jest aktywny w tej sesji.</div>{% endif %}
+        {% if demo_mode %}<div class="flash flash-info">{{ tr("Tryb demo jest aktywny w tej sesji.", "Demo mode is active in this session.") }}</div>{% endif %}
         {% block content %}{% endblock %}
     </main>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

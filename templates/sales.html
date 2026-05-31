@@ -1,8 +1,222 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Sprzedaż POS | SID 4.0{% endblock %}
 {% block page_title %}Sprzedaż POS{% endblock %}
-{% block page_subtitle %}Koszyk wielopozycyjny, rabaty, szybkie dodawanie pozycji i finalizacja sprzedaży z dokumentami WZ/FV.{% endblock %}
+{% block page_subtitle %}Skaner kodów, koszyk wielopozycyjny, rabaty i bezpieczne cofanie sprzedaży bez ruszania reszty systemu.{% endblock %}
 {% block content %}
-<section class="grid-two"><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-cart-plus"></i> Dodaj pozycję do koszyka</h3><span>Wybierz partię z dostępnego stanu i dołóż ją do POS.</span></div><form method="POST" action="{{ url_for('sales_cart_add') }}" class="form-grid"><div class="form-group full-row"><label>Partia / produkt</label><select name="batch_id" required><option value="">Wybierz</option>{% for item in inventory_items %}<option value="{{ item.batch_id }}">{{ item.title }} · {{ item.warehouse_name }} · dostępne {{ item.available_quantity_int }} · cena {{ "%.2f"|format(item.sale_price_float) }} zł</option>{% endfor %}</select></div><div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" value="1" required></div><div class="form-group"><label>Cena jednostkowa</label><input type="number" step="0.01" name="unit_price" placeholder="domyślna cena sprzedaży"></div><div class="form-group"><label>Rabat %</label><input type="number" step="0.01" min="0" max="100" name="discount_percent" value="0"></div><button type="submit" class="btn-submit full-row"><i class="fas fa-cart-plus"></i> Dodaj do koszyka</button></form><div class="panel-head compact"><h3><i class="fas fa-bolt"></i> Szybka sprzedaż jednej pozycji</h3><span>Stary tryb zostaje, ale korzysta już z tej samej logiki dokumentów i rabatów.</span></div><form method="POST" class="form-grid"><div class="form-group full-row"><label>Partia / produkt</label><select name="batch_id" required><option value="">Wybierz</option>{% for item in inventory_items %}<option value="{{ item.batch_id }}">{{ item.title }} · {{ item.warehouse_name }} · dostępne {{ item.available_quantity_int }}</option>{% endfor %}</select></div><div class="form-group"><label>Klient</label><select name="customer_id"><option value="">Klient detaliczny</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div><div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" required></div><div class="form-group"><label>Cena jednostkowa</label><input type="number" step="0.01" name="unit_price"></div><div class="form-group"><label>Rabat %</label><input type="number" step="0.01" min="0" max="100" name="discount_percent" value="0"></div><div class="form-group"><label>Płatność</label><select name="payment_method"><option value="cash">Gotówka</option><option value="card">Karta</option><option value="transfer">Przelew</option></select></div><label class="toggle-chip"><input type="checkbox" name="issue_invoice"> Wystaw też FV</label><div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="3"></textarea></div><button type="submit" class="btn-secondary full-row"><i class="fas fa-bolt"></i> Zapisz szybką sprzedaż</button></form></article><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-cart-shopping"></i> Koszyk POS</h3><span>{{ cart_summary.items_count }} pozycji · {{ cart_summary.units_count }} szt. · {{ "%.2f"|format(cart_summary.total) }} zł</span></div><section class="summary-grid compact-grid"><article class="summary-card"><span>Przed rabatem</span><strong>{{ "%.2f"|format(cart_summary.subtotal) }} zł</strong></article><article class="summary-card"><span>Rabat</span><strong>-{{ "%.2f"|format(cart_summary.discount_total) }} zł</strong></article><article class="summary-card"><span>Do zapłaty</span><strong>{{ "%.2f"|format(cart_summary.total) }} zł</strong></article></section><div class="table-wrap"><table><thead><tr><th>Produkt</th><th>Magazyn</th><th>Ilość</th><th>Cena</th><th>Rabat %</th><th>Przed rabatem</th><th>Wartość</th><th>Akcje</th></tr></thead><tbody>{% for item in cart_items %}<form id="cart-update-{{ item.batch_id }}" method="POST" action="{{ url_for('sales_cart_update', batch_id=item.batch_id) }}"></form><tr><td><strong>{{ item.title }}</strong><div class="muted-inline">Dostępne: {{ item.available_quantity }}</div></td><td>{{ item.warehouse_name }}</td><td><input form="cart-update-{{ item.batch_id }}" class="table-input small" type="number" name="quantity" min="0" value="{{ item.quantity }}"></td><td><input form="cart-update-{{ item.batch_id }}" class="table-input" type="number" step="0.01" name="unit_price" value="{{ '%.2f'|format(item.unit_price) }}"></td><td><input form="cart-update-{{ item.batch_id }}" class="table-input small" type="number" step="0.01" min="0" max="100" name="discount_percent" value="{{ '%.2f'|format(item.discount_percent) }}"></td><td>{{ "%.2f"|format(item.subtotal_price) }} zł</td><td><strong>{{ "%.2f"|format(item.total_price) }} zł</strong>{% if item.discount_value %}<div class="muted-inline">Rabat: -{{ "%.2f"|format(item.discount_value) }} zł</div>{% endif %}</td><td><div class="inline-actions"><button form="cart-update-{{ item.batch_id }}" type="submit" class="btn-primary">Zapisz</button><a href="{{ url_for('sales_cart_remove', batch_id=item.batch_id) }}" class="icon-btn danger"><i class="fas fa-trash"></i></a></div></td></tr>{% else %}<tr><td colspan="8">Koszyk jest pusty.</td></tr>{% endfor %}</tbody></table></div><form method="POST" action="{{ url_for('sales_checkout') }}" class="form-grid" style="margin-top:16px;"><div class="form-group"><label>Klient</label><select name="customer_id"><option value="">Klient detaliczny</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div><div class="form-group"><label>Płatność</label><select name="payment_method"><option value="cash">Gotówka</option><option value="card">Karta</option><option value="transfer">Przelew</option></select></div><label class="toggle-chip"><input type="checkbox" name="issue_invoice"> Wystaw FV do całego koszyka</label><div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="3"></textarea></div><div class="topbar-actions full-row"><button type="submit" class="btn-submit"><i class="fas fa-cash-register"></i> Finalizuj koszyk</button><a href="{{ url_for('sales_cart_clear') }}" class="btn-secondary"><i class="fas fa-eraser"></i> Wyczyść koszyk</a></div></form></article></section>
-<section class="grid-two"><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-receipt"></i> Ostatnie sprzedaże</h3><span>Transakcje po finalizacji</span></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Klient</th><th>Magazyn</th><th>Płatność</th><th>Status</th><th>Kwota</th><th>Data</th></tr></thead><tbody>{% for sale in sales_rows %}<tr><td>#{{ sale.id }}</td><td>{{ sale.customer_name }}</td><td>{{ sale.warehouse_name }}</td><td>{{ sale.payment_method }}</td><td>{{ sale.status }}</td><td>{{ "%.2f"|format(sale.total_amount) }} zł</td><td>{{ sale.created_at }}</td></tr>{% else %}<tr><td colspan="7">Brak zapisanej sprzedaży.</td></tr>{% endfor %}</tbody></table></div></article><article class="panel-card"><div class="panel-head"><h3><i class="fas fa-file-invoice"></i> Ostatnie dokumenty</h3><span>Dokumenty WZ i FV</span></div><div class="table-wrap"><table><thead><tr><th>Numer</th><th>Typ</th><th>Powiązanie</th><th>Kwota</th><th>Data</th><th>PDF</th></tr></thead><tbody>{% for document in documents %}<tr><td><a href="{{ url_for('document_detail', document_id=document.id) }}">{{ document.doc_number }}</a></td><td><span class="badge badge-neutral">{{ document.doc_type }}</span></td><td>{{ document.related_type }} #{{ document.related_id }}</td><td>{{ "%.2f"|format(document.total_amount) }} zł</td><td>{{ document.created_at }}</td><td><a href="{{ url_for('document_pdf', document_id=document.id) }}" class="icon-btn"><i class="fas fa-file-pdf"></i></a></td></tr>{% else %}<tr><td colspan="6">Brak dokumentów sprzedażowych.</td></tr>{% endfor %}</tbody></table></div></article></section>
+<section class="feature-strip">
+    <article class="feature-chip"><span>Skaner</span><strong>EAN / SKU / nazwa</strong></article>
+    <article class="feature-chip"><span>Marża koszyka</span><strong>{{ "%.2f"|format(cart_summary.estimated_margin_total) }} zł</strong></article>
+    <article class="feature-chip"><span>Cofnięcia</span><strong>Tylko admin / manager</strong></article>
+</section>
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-barcode"></i> Skaner i szybkie dodawanie</h3>
+            <span>Dodaj produkt po EAN, SKU albo nazwie, a potem pracuj na zwykłym koszyku POS.</span>
+        </div>
+        <form method="POST" action="{{ url_for('sales_cart_scan') }}" class="form-grid scanner-form">
+            <div class="form-group full-row">
+                <label>Kod skanera / EAN / SKU / nazwa</label>
+                <input type="text" name="scan_code" placeholder="Np. 5901234123457 albo MLEKO-1L" autofocus required>
+            </div>
+            <div class="form-group">
+                <label>Ilość</label>
+                <input type="number" name="quantity" min="1" value="1" required>
+            </div>
+            <div class="form-group action-align-end">
+                <button type="submit" class="btn-submit"><i class="fas fa-barcode"></i> Zeskanuj do koszyka</button>
+            </div>
+        </form>
+
+        <div class="panel-head compact">
+            <h3><i class="fas fa-cart-plus"></i> Dodaj pozycję do koszyka</h3>
+            <span>Wybierz partię z dostępnego stanu i dołóż ją do POS.</span>
+        </div>
+        <form method="POST" action="{{ url_for('sales_cart_add') }}" class="form-grid">
+            <div class="form-group full-row">
+                <label>Partia / produkt</label>
+                <select name="batch_id" required>
+                    <option value="">Wybierz</option>
+                    {% for item in inventory_items %}
+                        <option value="{{ item.batch_id }}">{{ item.title }} - {{ item.warehouse_name }} - dostępne {{ item.available_quantity_int }} - cena {{ "%.2f"|format(item.sale_price_float) }} zł</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" value="1" required></div>
+            <div class="form-group"><label>Cena jednostkowa</label><input type="number" step="0.01" name="unit_price" placeholder="domyślna cena sprzedaży"></div>
+            <div class="form-group"><label>Rabat %</label><input type="number" step="0.01" min="0" max="100" name="discount_percent" value="0"></div>
+            <button type="submit" class="btn-submit full-row"><i class="fas fa-cart-plus"></i> Dodaj do koszyka</button>
+        </form>
+
+        <div class="panel-head compact">
+            <h3><i class="fas fa-bolt"></i> Szybka sprzedaż jednej pozycji</h3>
+            <span>Dotychczasowy tryb zostaje, ale korzysta z tej samej logiki rabatów i dokumentów.</span>
+        </div>
+        <form method="POST" class="form-grid">
+            <div class="form-group full-row">
+                <label>Partia / produkt</label>
+                <select name="batch_id" required>
+                    <option value="">Wybierz</option>
+                    {% for item in inventory_items %}
+                        <option value="{{ item.batch_id }}">{{ item.title }} - {{ item.warehouse_name }} - dostępne {{ item.available_quantity_int }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group"><label>Klient</label><select name="customer_id"><option value="">Klient detaliczny</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Ilość</label><input type="number" name="quantity" min="1" required></div>
+            <div class="form-group"><label>Cena jednostkowa</label><input type="number" step="0.01" name="unit_price"></div>
+            <div class="form-group"><label>Rabat %</label><input type="number" step="0.01" min="0" max="100" name="discount_percent" value="0"></div>
+            <div class="form-group"><label>Płatność</label><select name="payment_method"><option value="cash">Gotówka</option><option value="card">Karta</option><option value="transfer">Przelew</option></select></div>
+            <label class="toggle-chip"><input type="checkbox" name="issue_invoice"> Wystaw też FV</label>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="3"></textarea></div>
+            <button type="submit" class="btn-secondary full-row"><i class="fas fa-bolt"></i> Zapisz szybką sprzedaż</button>
+        </form>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-cart-shopping"></i> Koszyk POS</h3>
+            <span>{{ cart_summary.items_count }} pozycji - {{ cart_summary.units_count }} szt. - {{ "%.2f"|format(cart_summary.total) }} zł</span>
+        </div>
+
+        <section class="summary-grid compact-grid">
+            <article class="summary-card"><span>Przed rabatem</span><strong>{{ "%.2f"|format(cart_summary.subtotal) }} zł</strong></article>
+            <article class="summary-card"><span>Rabat</span><strong>-{{ "%.2f"|format(cart_summary.discount_total) }} zł</strong></article>
+            <article class="summary-card"><span>Do zapłaty</span><strong>{{ "%.2f"|format(cart_summary.total) }} zł</strong></article>
+            <article class="summary-card"><span>Szacowana marża</span><strong>{{ "%.2f"|format(cart_summary.estimated_margin_total) }} zł</strong></article>
+        </section>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produkt</th>
+                        <th>Magazyn</th>
+                        <th>Ilość</th>
+                        <th>Cena</th>
+                        <th>Rabat %</th>
+                        <th>Przed rabatem</th>
+                        <th>Wartość</th>
+                        <th>Marża</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cart_items %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.title }}</strong>
+                                <div class="muted-inline">Dostępne: {{ item.available_quantity }}</div>
+                                <form id="cart-form-{{ item.batch_id }}" method="POST" action="{{ url_for('sales_cart_update', batch_id=item.batch_id) }}"></form>
+                            </td>
+                            <td>{{ item.warehouse_name }}</td>
+                            <td><input form="cart-form-{{ item.batch_id }}" class="table-input small" type="number" name="quantity" min="0" value="{{ item.quantity }}"></td>
+                            <td><input form="cart-form-{{ item.batch_id }}" class="table-input" type="number" step="0.01" name="unit_price" value="{{ '%.2f'|format(item.unit_price) }}"></td>
+                            <td><input form="cart-form-{{ item.batch_id }}" class="table-input small" type="number" step="0.01" min="0" max="100" name="discount_percent" value="{{ '%.2f'|format(item.discount_percent) }}"></td>
+                            <td>{{ "%.2f"|format(item.subtotal_price) }} zł</td>
+                            <td>
+                                <strong>{{ "%.2f"|format(item.total_price) }} zł</strong>
+                                {% if item.discount_value %}
+                                    <div class="muted-inline">Rabat: -{{ "%.2f"|format(item.discount_value) }} zł</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(item.estimated_margin) }} zł</td>
+                            <td>
+                                <div class="inline-actions">
+                                    <button form="cart-form-{{ item.batch_id }}" type="submit" class="btn-primary">Zapisz</button>
+                                    <a href="{{ url_for('sales_cart_remove', batch_id=item.batch_id) }}" class="icon-btn danger"><i class="fas fa-trash"></i></a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="9">Koszyk jest pusty.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <form method="POST" action="{{ url_for('sales_checkout') }}" class="form-grid" style="margin-top:16px;">
+            <div class="form-group"><label>Klient</label><select name="customer_id"><option value="">Klient detaliczny</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></div>
+            <div class="form-group"><label>Płatność</label><select name="payment_method"><option value="cash">Gotówka</option><option value="card">Karta</option><option value="transfer">Przelew</option></select></div>
+            <label class="toggle-chip"><input type="checkbox" name="issue_invoice"> Wystaw FV do całego koszyka</label>
+            <div class="form-group full-row"><label>Notatki</label><textarea name="notes" rows="3"></textarea></div>
+            <div class="topbar-actions full-row">
+                <button type="submit" class="btn-submit"><i class="fas fa-cash-register"></i> Finalizuj koszyk</button>
+                <a href="{{ url_for('sales_cart_clear') }}" class="btn-secondary"><i class="fas fa-eraser"></i> Wyczyść koszyk</a>
+            </div>
+        </form>
+    </article>
+</section>
+
+<section class="grid-two">
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-receipt"></i> Ostatnie sprzedaże</h3>
+            <span>Finalizacja sprzedaży, marża i cofanie operacji dla kierownika lub admina.</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>ID</th><th>Klient</th><th>Magazyn</th><th>Sztuki</th><th>Płatność</th><th>Status</th><th>Kwota</th><th>Marża</th><th>Data</th><th>Akcje</th></tr></thead>
+                <tbody>
+                    {% for sale in sales_rows %}
+                        <tr>
+                            <td>#{{ sale.id }}</td>
+                            <td>{{ sale.customer_name }}</td>
+                            <td>{{ sale.warehouse_name }}</td>
+                            <td>{{ sale.items_count }}</td>
+                            <td>{{ sale.payment_method }}</td>
+                            <td>
+                                <span class="badge {% if sale.status == 'reversed' %}badge-danger-soft{% else %}badge-neutral{% endif %}">{{ sale.status }}</span>
+                                {% if sale.reversed_at %}
+                                    <div class="muted-inline">{{ sale.reversed_at }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(sale.total_amount) }} zł</td>
+                            <td>{{ "%.2f"|format(sale.estimated_margin) }} zł</td>
+                            <td>{{ sale.created_at }}</td>
+                            <td>
+                                {% if sale.status != 'reversed' %}
+                                    <form method="POST" action="{{ url_for('sales_reverse', sale_id=sale.id) }}" class="inline-form compact-inline-form">
+                                        <input type="text" name="reason" placeholder="Powód cofnięcia">
+                                        <button type="submit" class="btn-danger"><i class="fas fa-rotate-left"></i> Cofnij</button>
+                                    </form>
+                                {% else %}
+                                    <div class="muted-inline">{{ sale.reverse_reason or 'Cofnięto bez opisu.' }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="10">Brak zapisanej sprzedaży.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel-card">
+        <div class="panel-head">
+            <h3><i class="fas fa-file-invoice"></i> Ostatnie dokumenty</h3>
+            <span>Dokumenty WZ i FV</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Numer</th><th>Typ</th><th>Powiązanie</th><th>Kwota</th><th>Data</th><th>PDF</th></tr></thead>
+                <tbody>
+                    {% for document in documents %}
+                        <tr>
+                            <td><a href="{{ url_for('document_detail', document_id=document.id) }}">{{ document.doc_number }}</a></td>
+                            <td><span class="badge badge-neutral">{{ document.doc_type }}</span></td>
+                            <td>{{ document.related_type }} #{{ document.related_id }}</td>
+                            <td>{{ "%.2f"|format(document.total_amount) }} zł</td>
+                            <td>{{ document.created_at }}</td>
+                            <td><a href="{{ url_for('document_pdf', document_id=document.id) }}" class="icon-btn"><i class="fas fa-file-pdf"></i></a></td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6">Brak dokumentów sprzedażowych.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
 {% endblock %}

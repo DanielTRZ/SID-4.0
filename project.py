@@ -34,10 +34,24 @@ BACKUP_FOLDER = os.path.join(BASE_DIR, "backups")
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 FILE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "txt"}
 ROLES = ["admin", "manager", "warehouse", "sales"]
+SUPPORTED_LANGUAGES = ("pl", "en")
+
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(BACKUP_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+
+class ManagedSQLiteConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self.rollback()
+        finally:
+            self.close()
+        return False
 
 
 def now_iso():
@@ -71,6 +85,29 @@ def clean_value(value, default=""):
         return default
     return str(value).strip()
 
+
+
+
+def get_current_language():
+    lang = clean_value(session.get("lang"), "pl").lower()
+    return lang if lang in SUPPORTED_LANGUAGES else "pl"
+
+
+def tr(pl_text, en_text):
+    return en_text if get_current_language() == "en" else pl_text
+
+
+def trf(pl_text, en_text, **kwargs):
+    template = tr(pl_text, en_text)
+    return template.format(**kwargs)
+
+
+def current_language_label():
+    return "EN" if get_current_language() == "en" else "PL"
+
+
+def opposite_language():
+    return "pl" if get_current_language() == "en" else "en"
 
 def clean_pdf_text(text):
     replacements = {
@@ -131,7 +168,7 @@ def file_url(filename):
 
 
 def get_db():
-    connection = sqlite3.connect(DATABASE)
+    connection = sqlite3.connect(DATABASE, factory=ManagedSQLiteConnection)
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -192,15 +229,33 @@ def next_document_number(doc_type):
     return f"{prefix}/{year}/{serial:04d}"
 
 
-def log_audit(action, entity, entity_id, details):
+def log_audit(action, entity, entity_id, details, before_state="", after_state=""):
     user_id = session.get("user_id")
-    execute_db(
-        """
-        INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (user_id, action, entity, str(entity_id), details, now_iso()),
-    )
+    with get_db() as connection:
+        audit_columns = {row["name"] for row in connection.execute("PRAGMA table_info(audit_log)").fetchall()}
+        if {"before_state", "after_state"}.issubset(audit_columns):
+            connection.execute(
+                """
+                INSERT INTO audit_log (user_id, action, entity, entity_id, details, before_state, after_state, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, action, entity, str(entity_id), details, clean_value(before_state), clean_value(after_state), now_iso()),
+            )
+        else:
+            connection.execute(
+                """
+                INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, action, entity, str(entity_id), details, now_iso()),
+            )
+        connection.commit()
+
+
+def format_state_pairs(data):
+    if not data:
+        return ""
+    return "; ".join(f"{key}={value}" for key, value in data.items())
 
 
 def init_db():
@@ -536,6 +591,28 @@ def init_db():
         if "discount_percent" not in sale_item_columns:
             connection.execute("ALTER TABLE sale_items ADD COLUMN discount_percent REAL NOT NULL DEFAULT 0")
 
+        sales_columns = {row["name"] for row in connection.execute("PRAGMA table_info(sales)").fetchall()}
+        if "reversed_at" not in sales_columns:
+            connection.execute("ALTER TABLE sales ADD COLUMN reversed_at TEXT")
+        if "reversed_by" not in sales_columns:
+            connection.execute("ALTER TABLE sales ADD COLUMN reversed_by INTEGER")
+        if "reverse_reason" not in sales_columns:
+            connection.execute("ALTER TABLE sales ADD COLUMN reverse_reason TEXT")
+
+        movement_columns = {row["name"] for row in connection.execute("PRAGMA table_info(stock_movements)").fetchall()}
+        if "reversed_at" not in movement_columns:
+            connection.execute("ALTER TABLE stock_movements ADD COLUMN reversed_at TEXT")
+        if "reversed_by" not in movement_columns:
+            connection.execute("ALTER TABLE stock_movements ADD COLUMN reversed_by INTEGER")
+        if "reverse_reason" not in movement_columns:
+            connection.execute("ALTER TABLE stock_movements ADD COLUMN reverse_reason TEXT")
+
+        audit_columns = {row["name"] for row in connection.execute("PRAGMA table_info(audit_log)").fetchall()}
+        if "before_state" not in audit_columns:
+            connection.execute("ALTER TABLE audit_log ADD COLUMN before_state TEXT NOT NULL DEFAULT ''")
+        if "after_state" not in audit_columns:
+            connection.execute("ALTER TABLE audit_log ADD COLUMN after_state TEXT NOT NULL DEFAULT ''")
+
         connection.commit()
 
     migrate_csv_inventory()
@@ -682,6 +759,11 @@ def inject_globals():
         "current_user": g.user,
         "roles": ROLES,
         "demo_mode": session.get("demo_mode", False),
+        "current_language": get_current_language(),
+        "current_language_label": current_language_label(),
+        "opposite_language": opposite_language(),
+        "supported_languages": SUPPORTED_LANGUAGES,
+        "tr": tr,
     }
 
 
@@ -850,19 +932,31 @@ def get_recent_sales(limit=10):
     rows = query_all(
         """
         SELECT s.id, s.total_amount, s.payment_method, s.status, s.created_at,
+               s.reversed_at, s.reverse_reason,
                COALESCE(c.name, 'Klient detaliczny') AS customer_name,
                w.name AS warehouse_name,
-               u.full_name AS user_name
+               u.full_name AS user_name,
+               COALESCE(SUM(si.quantity), 0) AS items_count,
+               COALESCE(SUM(si.total_price), 0) AS line_total,
+               COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
         FROM sales s
         LEFT JOIN customers c ON c.id = s.customer_id
         JOIN warehouses w ON w.id = s.warehouse_id
         LEFT JOIN users u ON u.id = s.user_id
+        LEFT JOIN sale_items si ON si.sale_id = s.id
+        LEFT JOIN products p ON p.id = si.product_id
+        GROUP BY s.id, c.name, w.name, u.full_name
         ORDER BY s.created_at DESC
         LIMIT ?
         """,
         (limit,),
     )
-    return [dict(row) for row in rows]
+    data = []
+    for row in rows:
+        entry = dict(row)
+        entry["estimated_margin"] = round(float_safe(entry.get("line_total"), 0.0) - float_safe(entry.get("purchase_total"), 0.0), 2)
+        data.append(entry)
+    return data
 
 
 def get_recent_audit(limit=12):
@@ -876,7 +970,13 @@ def get_recent_audit(limit=12):
         """,
         (limit,),
     )
-    return [dict(row) for row in rows]
+    data = []
+    for row in rows:
+        entry = dict(row)
+        entry["before_state"] = clean_value(entry.get("before_state"))
+        entry["after_state"] = clean_value(entry.get("after_state"))
+        data.append(entry)
+    return data
 
 
 def get_recent_movements(limit=15):
@@ -973,11 +1073,51 @@ def clear_cart():
     session.modified = True
 
 
+def add_item_to_pos_cart(item, quantity=1, unit_price=None, discount_percent=0.0, replace=False):
+    if not item:
+        raise ValueError("Nie znaleziono partii do dodania do koszyka.")
+    quantity = int_safe(quantity, 1)
+    if quantity <= 0:
+        raise ValueError("IloÅÄ musi byÄ wiÄksza od zera.")
+
+    existing_items = build_cart_items()
+    if existing_items and any(entry["warehouse_id"] != item["warehouse_id"] for entry in existing_items):
+        raise ValueError("Koszyk POS moÅ¼e zawieraÄ pozycje tylko z jednego magazynu.")
+
+    cart = get_cart()
+    existing = next((entry for entry in cart if entry["batch_id"] == item["batch_id"]), None)
+    safe_unit_price = float_safe(unit_price, item["sale_price_float"])
+    safe_discount = max(0.0, min(100.0, float_safe(discount_percent, 0.0)))
+    target_quantity = quantity if replace or not existing else int_safe(existing.get("quantity"), 0) + quantity
+
+    if target_quantity > item["available_quantity_int"]:
+        raise ValueError("Koszyk przekracza dostÄpny stan magazynowy.")
+
+    if existing:
+        existing["quantity"] = target_quantity
+        existing["unit_price"] = safe_unit_price or item["sale_price_float"]
+        existing["discount_percent"] = safe_discount
+    else:
+        cart.append({
+            "batch_id": item["batch_id"],
+            "quantity": target_quantity,
+            "unit_price": safe_unit_price or item["sale_price_float"],
+            "discount_percent": safe_discount,
+        })
+    save_cart(cart)
+    return target_quantity
+
+
+
+
 def summarize_line_items(items):
     subtotal = round(sum(float_safe(item.get("subtotal_price"), int_safe(item.get("quantity"), 0) * float_safe(item.get("unit_price"), 0.0)) for item in items), 2)
     discount_total = round(sum(float_safe(item.get("discount_value"), 0.0) for item in items), 2)
     total = round(sum(float_safe(item.get("total_price"), 0.0) for item in items), 2)
-    return {"items_count": len(items), "units_count": sum(int_safe(item.get("quantity"), 0) for item in items), "subtotal": subtotal, "discount_total": discount_total, "total": total}
+    estimated_margin_total = round(sum(float_safe(item.get("estimated_margin"), 0.0) for item in items), 2)
+    return {"items_count": len(items), "units_count": sum(int_safe(item.get("quantity"), 0) for item in items), "subtotal": subtotal, "discount_total": discount_total, "total": total, "estimated_margin_total": estimated_margin_total}
+
+
 
 
 def build_cart_items():
@@ -989,28 +1129,10 @@ def build_cart_items():
     placeholders = ",".join("?" for _ in batch_ids)
     rows = query_all(
         f"""
-        SELECT
-            b.id AS batch_id,
-            b.quantity,
-            b.expiry_date,
-            b.purchase_date,
-            b.lot_number,
-            b.serial_number,
-            b.document,
-            b.image,
-            p.id AS product_id,
-            p.title,
-            p.sku,
-            p.ean,
-            p.category,
-            p.brand,
-            p.unit,
-            p.min_quantity,
-            p.purchase_price,
-            p.sale_price,
-            w.id AS warehouse_id,
-            w.name AS warehouse_name,
-            COALESCE((SELECT SUM(r.quantity) FROM reservations r WHERE r.batch_id = b.id AND r.status = 'reserved'), 0) AS reserved_quantity
+        SELECT b.id AS batch_id, b.quantity, b.expiry_date, b.purchase_date, b.lot_number, b.serial_number, b.document, b.image,
+               p.id AS product_id, p.title, p.sku, p.ean, p.category, p.brand, p.unit, p.min_quantity, p.purchase_price, p.sale_price,
+               w.id AS warehouse_id, w.name AS warehouse_name,
+               COALESCE((SELECT SUM(r.quantity) FROM reservations r WHERE r.batch_id = b.id AND r.status = 'reserved'), 0) AS reserved_quantity
         FROM stock_batches b
         JOIN products p ON p.id = b.product_id
         JOIN warehouses w ON w.id = b.warehouse_id
@@ -1031,8 +1153,26 @@ def build_cart_items():
         subtotal_price = round(quantity * unit_price, 2)
         discount_value = round(subtotal_price * discount_percent / 100, 2)
         total_price = round(subtotal_price - discount_value, 2)
-        items.append({"batch_id": batch["batch_id"], "product_id": batch["product_id"], "title": batch["title"], "warehouse_id": batch["warehouse_id"], "warehouse_name": batch["warehouse_name"], "available_quantity": batch["available_quantity_int"], "quantity": quantity, "unit_price": unit_price, "discount_percent": discount_percent, "subtotal_price": subtotal_price, "discount_value": discount_value, "total_price": total_price})
+        purchase_price = float_safe(batch.get("purchase_price_float"), 0.0)
+        items.append({
+            "batch_id": batch["batch_id"],
+            "product_id": batch["product_id"],
+            "title": batch["title"],
+            "warehouse_id": batch["warehouse_id"],
+            "warehouse_name": batch["warehouse_name"],
+            "available_quantity": batch["available_quantity_int"],
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "purchase_price": purchase_price,
+            "discount_percent": discount_percent,
+            "subtotal_price": subtotal_price,
+            "discount_value": discount_value,
+            "total_price": total_price,
+            "estimated_margin": round(total_price - (quantity * purchase_price), 2),
+        })
     return items
+
+
 
 
 def create_sale_transaction(connection, cart_items, customer_id, payment_method, notes="", issue_invoice=False):
@@ -1041,7 +1181,7 @@ def create_sale_transaction(connection, cart_items, customer_id, payment_method,
 
     warehouse_id = cart_items[0]["warehouse_id"]
     if any(item["warehouse_id"] != warehouse_id for item in cart_items):
-        raise ValueError("Wszystkie pozycje w koszyku musz? pochodzi? z jednego magazynu.")
+        raise ValueError("Wszystkie pozycje w koszyku muszÄ pochodziÄ z jednego magazynu.")
 
     total_amount = round(sum(item["total_price"] for item in cart_items), 2)
     sale_id = connection.execute(
@@ -1067,7 +1207,7 @@ def create_sale_transaction(connection, cart_items, customer_id, payment_method,
 
         available_quantity = int_safe(batch["quantity"], 0) - int_safe(batch["reserved_quantity"], 0)
         if item["quantity"] <= 0 or item["quantity"] > available_quantity:
-            raise ValueError(f"Za ma?o dost?pnego stanu dla pozycji {item['title']}.")
+            raise ValueError(f"Za maÅo dostÄpnego stanu dla pozycji {item['title']}.")
 
         connection.execute(
             """
@@ -1077,16 +1217,156 @@ def create_sale_transaction(connection, cart_items, customer_id, payment_method,
             (sale_id, item["batch_id"], item["product_id"], item["quantity"], item["unit_price"], max(0.0, min(100.0, float_safe(item.get("discount_percent"), 0.0))), item["total_price"]),
         )
         connection.execute("UPDATE stock_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?", (item["quantity"], now_iso(), item["batch_id"]))
-        create_stock_movement(connection, item["product_id"], item["batch_id"], item["warehouse_id"], "sale", item["quantity"], "sale", sale_id, f"Sprzeda? z POS: {item['title']}")
+        create_stock_movement(connection, item["product_id"], item["batch_id"], item["warehouse_id"], "sale", item["quantity"], "sale", sale_id, f"SprzedaÅ¼ z POS: {item['title']}")
 
-    wz_id, wz_number = create_document(connection, "WZ", "sale", sale_id, total_amount, warehouse_id=warehouse_id, customer_id=customer_id, notes="Dokument wydania zewn?trznego")
+    wz_id, wz_number = create_document(connection, "WZ", "sale", sale_id, total_amount, warehouse_id=warehouse_id, customer_id=customer_id, notes="Dokument wydania zewnÄtrznego")
 
     fv_id = None
     fv_number = ""
     if issue_invoice:
-        fv_id, fv_number = create_document(connection, "FV", "sale", sale_id, total_amount, warehouse_id=warehouse_id, customer_id=customer_id, notes="Faktura sprzeda?y")
+        fv_id, fv_number = create_document(connection, "FV", "sale", sale_id, total_amount, warehouse_id=warehouse_id, customer_id=customer_id, notes="Faktura sprzedaÅ¼y")
 
     return {"sale_id": sale_id, "total_amount": total_amount, "wz_id": wz_id, "wz_number": wz_number, "fv_id": fv_id, "fv_number": fv_number}
+
+
+def normalize_lookup_code(value):
+    return "".join(character for character in clean_value(value).lower() if character.isalnum())
+
+
+def find_inventory_item_by_code(code):
+    raw_code = clean_value(code)
+    normalized_code = normalize_lookup_code(raw_code)
+    if not raw_code:
+        return None
+    for item in get_inventory_items():
+        lookup_values = {
+            normalize_lookup_code(item.get("ean")),
+            normalize_lookup_code(item.get("sku")),
+            normalize_lookup_code(item.get("title")),
+        }
+        if normalized_code and normalized_code in lookup_values:
+            return item
+        if raw_code.lower() == clean_value(item.get("title")).lower():
+            return item
+    return None
+
+
+
+
+def reverse_sale_transaction(sale_id, reason):
+    with get_db() as connection:
+        sale = connection.execute("SELECT * FROM sales WHERE id = ?", (sale_id,)).fetchone()
+        if not sale:
+            raise ValueError("Nie znaleziono sprzedaÅ¼y do cofniÄcia.")
+        if clean_value(sale["status"]).lower() == "reversed":
+            raise ValueError("Ta sprzedaÅ¼ zostaÅa juÅ¼ cofniÄta.")
+
+        items = connection.execute(
+            """
+            SELECT si.*, p.title, b.warehouse_id
+            FROM sale_items si
+            JOIN products p ON p.id = si.product_id
+            JOIN stock_batches b ON b.id = si.batch_id
+            WHERE si.sale_id = ?
+            """,
+            (sale_id,),
+        ).fetchall()
+        if not items:
+            raise ValueError("SprzedaÅ¼ nie ma pozycji do cofniÄcia.")
+
+        summary_before = {"status": sale["status"], "total_amount": sale["total_amount"], "reason": clean_value(reason)}
+        for item in items:
+            connection.execute(
+                "UPDATE stock_batches SET quantity = quantity + ?, updated_at = ? WHERE id = ?",
+                (item["quantity"], now_iso(), item["batch_id"]),
+            )
+            create_stock_movement(
+                connection,
+                item["product_id"],
+                item["batch_id"],
+                item["warehouse_id"],
+                "sale_reversal",
+                item["quantity"],
+                "sale_reversal",
+                sale_id,
+                f"CofniÄcie sprzedaÅ¼y: {item['title']}",
+            )
+
+        connection.execute(
+            "UPDATE sales SET status = 'reversed', reversed_at = ?, reversed_by = ?, reverse_reason = ? WHERE id = ?",
+            (now_iso(), session.get("user_id"), clean_value(reason), sale_id),
+        )
+        connection.execute(
+            "UPDATE documents SET status = 'reversed', notes = COALESCE(notes, '') || ? WHERE related_type = 'sale' AND related_id = ?",
+            (f" | CofniÄto: {clean_value(reason)}", str(sale_id)),
+        )
+        connection.commit()
+
+    log_audit(
+        "reverse",
+        "sale",
+        sale_id,
+        f"CofniÄto sprzedaÅ¼ #{sale_id}: {clean_value(reason) or 'bez podanego powodu'}",
+        before_state=format_state_pairs(summary_before),
+        after_state=format_state_pairs({"status": "reversed", "reversed_at": now_iso()}),
+    )
+
+
+def reverse_manual_movement(movement_id, reason):
+    with get_db() as connection:
+        movement = connection.execute(
+            """
+            SELECT m.*, b.quantity AS batch_quantity, p.title AS product_title
+            FROM stock_movements m
+            JOIN stock_batches b ON b.id = m.batch_id
+            JOIN products p ON p.id = m.product_id
+            WHERE m.id = ?
+            """,
+            (movement_id,),
+        ).fetchone()
+        if not movement:
+            raise ValueError("Nie znaleziono ruchu magazynowego.")
+        if clean_value(movement["reversed_at"]):
+            raise ValueError("Ten ruch zostaÅ juÅ¼ cofniÄty.")
+        if movement["movement_type"] not in {"adjustment_in", "adjustment_out"}:
+            raise ValueError("Cofanie jest dostÄpne tylko dla rÄcznych korekt plus/minus.")
+
+        batch_quantity = int_safe(movement["batch_quantity"], 0)
+        quantity = int_safe(movement["quantity"], 0)
+        if movement["movement_type"] == "adjustment_in":
+            if batch_quantity < quantity:
+                raise ValueError("Brak wystarczajÄcego stanu do cofniÄcia korekty na plus.")
+            connection.execute("UPDATE stock_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?", (quantity, now_iso(), movement["batch_id"]))
+            reverse_type = "adjustment_in_reversal"
+        else:
+            connection.execute("UPDATE stock_batches SET quantity = quantity + ?, updated_at = ? WHERE id = ?", (quantity, now_iso(), movement["batch_id"]))
+            reverse_type = "adjustment_out_reversal"
+
+        create_stock_movement(
+            connection,
+            movement["product_id"],
+            movement["batch_id"],
+            movement["warehouse_id"],
+            reverse_type,
+            quantity,
+            "movement_reversal",
+            movement_id,
+            f"CofniÄcie ruchu #{movement_id}: {clean_value(reason) or movement['notes']}",
+        )
+        connection.execute(
+            "UPDATE stock_movements SET reversed_at = ?, reversed_by = ?, reverse_reason = ? WHERE id = ?",
+            (now_iso(), session.get("user_id"), clean_value(reason), movement_id),
+        )
+        connection.commit()
+
+    log_audit(
+        "reverse",
+        "movement",
+        movement_id,
+        f"CofniÄto ruch magazynowy #{movement_id}: {clean_value(reason) or movement['product_title']}",
+        before_state=format_state_pairs({"movement_type": movement["movement_type"], "quantity": quantity}),
+        after_state=format_state_pairs({"reversed_at": now_iso(), "reverse_type": reverse_type}),
+    )
 
 
 def get_inventory_stats(items):
@@ -1322,35 +1602,123 @@ def get_owner_dashboard_metrics():
     metrics = get_dashboard_metrics()
     margin_row = query_one(
         """
-        SELECT
-            COALESCE(SUM(si.total_price), 0) AS sales_total,
-            COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
+        SELECT COALESCE(SUM(si.total_price), 0) AS sales_total,
+               COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total,
+               COUNT(DISTINCT s.id) AS sales_count
         FROM sale_items si
         JOIN products p ON p.id = si.product_id
+        JOIN sales s ON s.id = si.sale_id
+        WHERE COALESCE(s.status, 'completed') != 'reversed'
         """
     )
-    dead_stock = query_one(
+    today_margin_row = query_one(
         """
-        SELECT COUNT(*) AS total
-        FROM products p
-        LEFT JOIN sale_items si ON si.product_id = p.id
-        WHERE si.id IS NULL
-        """
+        SELECT COALESCE(SUM(si.total_price), 0) AS sales_total,
+               COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
+        FROM sale_items si
+        JOIN products p ON p.id = si.product_id
+        JOIN sales s ON s.id = si.sale_id
+        WHERE COALESCE(s.status, 'completed') != 'reversed' AND date(s.created_at) = ?
+        """,
+        (today_iso(),),
     )
+    dead_stock = query_one("SELECT COUNT(*) AS total FROM products p LEFT JOIN sale_items si ON si.product_id = p.id WHERE si.id IS NULL")
     reservations = query_one("SELECT COALESCE(SUM(quantity), 0) AS total FROM reservations WHERE status = 'reserved'")
     open_tasks = query_one("SELECT COUNT(*) AS total FROM tasks WHERE status != 'done'")
+    reversed_sales = query_one("SELECT COUNT(*) AS total FROM sales WHERE status = 'reversed'")
 
-    sales_total = float_safe(margin_row["sales_total"], 0.0)
-    purchase_total = float_safe(margin_row["purchase_total"], 0.0)
-    metrics.update(
-        {
-            "estimated_margin": round(sales_total - purchase_total, 2),
-            "dead_stock_count": int_safe(dead_stock["total"], 0),
-            "reserved_units": int_safe(reservations["total"], 0),
-            "open_tasks_count": int_safe(open_tasks["total"], 0),
-        }
-    )
+    def enrich(row):
+        entry = dict(row)
+        entry["sales_total"] = round(float_safe(entry.get("sales_total"), 0.0), 2)
+        entry["purchase_total"] = round(float_safe(entry.get("purchase_total"), 0.0), 2)
+        entry["margin_total"] = round(entry["sales_total"] - entry["purchase_total"], 2)
+        entry["margin_percent"] = round((entry["margin_total"] / entry["sales_total"] * 100.0), 2) if entry["sales_total"] else 0.0
+        return entry
+
+    top_margin_products = [
+        enrich(row)
+        for row in query_all(
+            """
+            SELECT p.title, COALESCE(SUM(si.quantity), 0) AS units_sold,
+                   COALESCE(SUM(si.total_price), 0) AS sales_total,
+                   COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
+            FROM sale_items si
+            JOIN products p ON p.id = si.product_id
+            JOIN sales s ON s.id = si.sale_id
+            WHERE COALESCE(s.status, 'completed') != 'reversed'
+            GROUP BY p.id
+            ORDER BY (COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * p.purchase_price), 0)) DESC, units_sold DESC, p.title ASC
+            LIMIT 5
+            """
+        )
+    ]
+    low_margin_products = [
+        enrich(row)
+        for row in query_all(
+            """
+            SELECT p.title, COALESCE(SUM(si.quantity), 0) AS units_sold,
+                   COALESCE(SUM(si.total_price), 0) AS sales_total,
+                   COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
+            FROM sale_items si
+            JOIN products p ON p.id = si.product_id
+            JOIN sales s ON s.id = si.sale_id
+            WHERE COALESCE(s.status, 'completed') != 'reversed'
+            GROUP BY p.id
+            HAVING COALESCE(SUM(si.quantity), 0) > 0
+            ORDER BY (COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * p.purchase_price), 0)) ASC, units_sold DESC, p.title ASC
+            LIMIT 5
+            """
+        )
+    ]
+    margin_by_day = [
+        enrich(row)
+        for row in query_all(
+            """
+            SELECT date(s.created_at) AS sale_day,
+                   COALESCE(SUM(si.total_price), 0) AS sales_total,
+                   COALESCE(SUM(si.quantity * p.purchase_price), 0) AS purchase_total
+            FROM sales s
+            LEFT JOIN sale_items si ON si.sale_id = s.id
+            LEFT JOIN products p ON p.id = si.product_id
+            WHERE date(s.created_at) >= date(?, '-6 day')
+              AND COALESCE(s.status, 'completed') != 'reversed'
+            GROUP BY date(s.created_at)
+            ORDER BY sale_day ASC
+            """,
+            (today_iso(),),
+        )
+    ]
+
+    sales_total = round(float_safe(margin_row["sales_total"], 0.0), 2)
+    purchase_total = round(float_safe(margin_row["purchase_total"], 0.0), 2)
+    estimated_margin = round(sales_total - purchase_total, 2)
+    sales_count = int_safe(margin_row["sales_count"], 0)
+    margin_percent = round((estimated_margin / sales_total * 100.0), 2) if sales_total else 0.0
+    today_sales_total = round(float_safe(today_margin_row["sales_total"], 0.0), 2)
+    today_purchase_total = round(float_safe(today_margin_row["purchase_total"], 0.0), 2)
+    today_margin = round(today_sales_total - today_purchase_total, 2)
+    today_margin_percent = round((today_margin / today_sales_total * 100.0), 2) if today_sales_total else 0.0
+
+    metrics.update({
+        "estimated_margin": estimated_margin,
+        "sales_total_all": sales_total,
+        "purchase_total_all": purchase_total,
+        "margin_percent": margin_percent,
+        "sales_count": sales_count,
+        "average_margin_per_sale": round((estimated_margin / sales_count), 2) if sales_count else 0.0,
+        "today_margin": today_margin,
+        "today_margin_percent": today_margin_percent,
+        "dead_stock_count": int_safe(dead_stock["total"], 0),
+        "reserved_units": int_safe(reservations["total"], 0),
+        "open_tasks_count": int_safe(open_tasks["total"], 0),
+        "reversed_sales_count": int_safe(reversed_sales["total"], 0),
+        "top_margin_products": top_margin_products,
+        "low_margin_products": low_margin_products,
+        "margin_by_day": margin_by_day,
+    })
     return metrics
+
+
 
 
 def get_dictionary_values():
@@ -1498,7 +1866,9 @@ def login():
         user = query_one("SELECT * FROM users WHERE username = ? AND active = 1", (username,))
 
         if user and check_password_hash(user["password_hash"], password):
+            selected_lang = get_current_language()
             session.clear()
+            session["lang"] = selected_lang
             session["user_id"] = user["id"]
             log_audit("login", "user", user["id"], f"Użytkownik {user['username']} zalogował się do systemu")
             return redirect(url_for("dashboard"))
@@ -1508,12 +1878,26 @@ def login():
     return render_template("login.html")
 
 
+
+
+@app.route("/language/<string:lang>")
+def set_language(lang):
+    lang = clean_value(lang).lower()
+    if lang in SUPPORTED_LANGUAGES:
+        session["lang"] = lang
+    next_url = clean_value(request.args.get("next"))
+    if not next_url:
+        next_url = request.referrer or url_for("login")
+    return redirect(next_url)
+
 @app.route("/logout")
 def logout():
     user_id = session.get("user_id")
+    selected_lang = get_current_language()
     if user_id:
         log_audit("logout", "user", user_id, "Wylogowano z systemu")
     session.clear()
+    session["lang"] = selected_lang
     return redirect(url_for("login"))
 
 
@@ -1994,11 +2378,11 @@ def sales():
                 (batch_id,),
             ).fetchone()
             if not batch:
-                flash("Nie znaleziono partii do sprzeda?y.", "error")
+                flash("Nie znaleziono partii do sprzedaÅ¼y.", "error")
                 return redirect(url_for("sales"))
             available_quantity = int_safe(batch["quantity"], 0) - int_safe(batch["reserved_quantity"], 0)
             if quantity <= 0 or quantity > available_quantity:
-                flash("Nieprawid?owa ilo?? do sprzeda?y.", "error")
+                flash("NieprawidÅowa iloÅÄ do sprzedaÅ¼y.", "error")
                 return redirect(url_for("sales"))
 
             unit_price = float_safe(request.form.get("unit_price"), float_safe(batch["sale_price"], 0.0))
@@ -2015,13 +2399,15 @@ def sales():
             )
             connection.commit()
 
-        log_audit("create", "sale", result["sale_id"], f"Sprzedano {quantity} szt. produktu {batch['title']}")
-        flash(f"Sprzeda? zosta?a zapisana. Utworzono dokument {result['wz_number']}.", "success")
+        log_audit("create", "sale", result["sale_id"], f"Sprzedano {quantity} szt. produktu {batch['title']}", after_state=format_state_pairs({"total": total_price, "payment": payment_method, "discount_percent": discount_percent}))
+        flash(f"SprzedaÅ¼ zostaÅa zapisana. Utworzono dokument {result['wz_number']}.", "success")
         return redirect(url_for("sales"))
 
     cart_items = build_cart_items()
     cart_summary = summarize_line_items(cart_items)
     return render_template("sales.html", sales_rows=get_recent_sales(20), inventory_items=get_inventory_items(), customers=get_customers(), warehouses=get_warehouses(), cart_items=cart_items, cart_summary=cart_summary, documents=get_documents(15))
+
+
 
 
 @app.route("/sales/cart/add", methods=["POST"])
@@ -2036,30 +2422,34 @@ def sales_cart_add():
     if not item:
         flash("Nie znaleziono partii do dodania do koszyka.", "error")
         return redirect(url_for("sales"))
-    if quantity <= 0 or quantity > item["available_quantity_int"]:
-        flash("Nieprawid?owa ilo?? dost?pna do dodania do koszyka.", "error")
-        return redirect(url_for("sales"))
 
-    cart_items = build_cart_items()
-    if cart_items and any(entry["warehouse_id"] != item["warehouse_id"] for entry in cart_items):
-        flash("Koszyk POS mo?e zawiera? pozycje tylko z jednego magazynu.", "error")
-        return redirect(url_for("sales"))
-
-    cart = get_cart()
-    existing = next((entry for entry in cart if entry["batch_id"] == batch_id), None)
-    if existing:
-        new_quantity = existing["quantity"] + quantity
-        if new_quantity > item["available_quantity_int"]:
-            flash("Koszyk przekracza dost?pny stan magazynowy.", "error")
-            return redirect(url_for("sales"))
-        existing["quantity"] = new_quantity
-        existing["unit_price"] = unit_price or item["sale_price_float"]
-        existing["discount_percent"] = discount_percent
-    else:
-        cart.append({"batch_id": batch_id, "quantity": quantity, "unit_price": unit_price or item["sale_price_float"], "discount_percent": discount_percent})
-    save_cart(cart)
-    flash(f"Dodano {item['title']} do koszyka POS.", "success")
+    try:
+        add_item_to_pos_cart(item, quantity=quantity, unit_price=unit_price, discount_percent=discount_percent)
+        flash(f"Dodano {item['title']} do koszyka POS.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
     return redirect(url_for("sales"))
+
+
+@app.route("/sales/cart/scan", methods=["POST"])
+@login_required
+def sales_cart_scan():
+    scan_code = clean_value(request.form.get("scan_code"))
+    quantity = int_safe(request.form.get("quantity"), 1)
+
+    item = find_inventory_item_by_code(scan_code)
+    if not item:
+        flash("Nie znaleziono produktu po kodzie EAN, SKU ani nazwie.", "error")
+        return redirect(url_for("sales"))
+
+    try:
+        add_item_to_pos_cart(item, quantity=quantity)
+        flash(f"Zeskanowano {item['title']} i dodano do koszyka POS.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("sales"))
+
+
 
 
 @app.route("/sales/cart/remove/<int:batch_id>")
@@ -2067,7 +2457,7 @@ def sales_cart_add():
 def sales_cart_remove(batch_id):
     cart = [item for item in get_cart() if item["batch_id"] != batch_id]
     save_cart(cart)
-    flash("Usuni?to pozycj? z koszyka.", "info")
+    flash("UsuniÄto pozycjÄ z koszyka.", "info")
     return redirect(url_for("sales"))
 
 
@@ -2086,24 +2476,23 @@ def sales_cart_update(batch_id):
     cart = get_cart()
     existing = next((entry for entry in cart if entry["batch_id"] == batch_id), None)
     if not existing:
-        flash("Ta pozycja nie znajduje si? ju? w koszyku.", "error")
+        flash("Ta pozycja nie znajduje siÄ juÅ¼ w koszyku.", "error")
         return redirect(url_for("sales"))
 
     if quantity <= 0:
         cart = [entry for entry in cart if entry["batch_id"] != batch_id]
         save_cart(cart)
-        flash("Pozycja zosta?a usuni?ta z koszyka.", "info")
-        return redirect(url_for("sales"))
-    if quantity > item["available_quantity_int"]:
-        flash("Ilo?? w koszyku przekracza dost?pny stan magazynowy.", "error")
+        flash("Pozycja zostaÅa usuniÄta z koszyka.", "info")
         return redirect(url_for("sales"))
 
-    existing["quantity"] = quantity
-    existing["unit_price"] = unit_price or item["sale_price_float"]
-    existing["discount_percent"] = discount_percent
-    save_cart(cart)
-    flash("Zaktualizowano pozycj? w koszyku POS.", "success")
+    try:
+        add_item_to_pos_cart(item, quantity=quantity, unit_price=unit_price, discount_percent=discount_percent, replace=True)
+        flash("Zaktualizowano pozycjÄ w koszyku POS.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
     return redirect(url_for("sales"))
+
+
 
 
 @app.route("/sales/cart/clear")
@@ -2118,6 +2507,7 @@ def sales_cart_clear():
 @login_required
 def sales_checkout():
     cart_items = build_cart_items()
+    cart_summary = summarize_line_items(cart_items)
     customer_id = int_safe(request.form.get("customer_id"), 0)
     payment_method = clean_value(request.form.get("payment_method"), "cash") or "cash"
     notes = clean_value(request.form.get("notes"))
@@ -2132,8 +2522,8 @@ def sales_checkout():
             result = create_sale_transaction(connection, cart_items, customer_id, payment_method, notes, issue_invoice)
             connection.commit()
         clear_cart()
-        log_audit("create", "sale", result["sale_id"], f"Zamkni?to koszyk POS, dokument {result['wz_number']}")
-        message = f"Sprzeda? POS zosta?a zapisana. Utworzono {result['wz_number']}."
+        log_audit("create", "sale", result["sale_id"], f"ZamkniÄto koszyk POS, dokument {result['wz_number']}", after_state=format_state_pairs({"items_count": cart_summary["items_count"], "units_count": cart_summary["units_count"], "total": cart_summary["total"], "estimated_margin": cart_summary["estimated_margin_total"], "payment": payment_method, "invoice": "tak" if result["fv_number"] else "nie"}))
+        message = f"SprzedaÅ¼ POS zostaÅa zapisana. Utworzono {result['wz_number']}."
         if result["fv_number"]:
             message += f" Faktura: {result['fv_number']}."
         flash(message, "success")
@@ -2141,6 +2531,20 @@ def sales_checkout():
         flash(str(error), "error")
 
     return redirect(url_for("sales"))
+
+
+@app.route("/sales/<int:sale_id>/reverse", methods=["POST"])
+@login_required
+@role_required("admin", "manager")
+def sales_reverse(sale_id):
+    reason = clean_value(request.form.get("reason"))
+    try:
+        reverse_sale_transaction(sale_id, reason)
+        flash("SprzedaÅ¼ zostaÅa cofniÄta, a stan magazynowy przywrÃ³cony.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("sales"))
+
 
 
 def get_document_payload(document_id):
@@ -2203,7 +2607,19 @@ def build_document_pdf(document, items, settings):
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, clean_pdf_text(f"Dokument {document['doc_type']} {document['doc_number']}"), ln=True)
+    pdf.cell(
+        0,
+        10,
+        clean_pdf_text(
+            trf(
+                "Dokument {doc_type} {doc_number}",
+                "Document {doc_type} {doc_number}",
+                doc_type=document["doc_type"],
+                doc_number=document["doc_number"],
+            )
+        ),
+        ln=True,
+    )
     pdf.set_font("Arial", size=10)
     pdf.cell(0, 7, clean_pdf_text(settings.get("company_name") or "SID 4.0"), ln=True)
     if settings.get("company_tax_id"):
@@ -2218,20 +2634,34 @@ def build_document_pdf(document, items, settings):
     if counterparty == "Brak dostawcy":
         counterparty = "-"
 
-    for label, value in [("Numer", document.get("doc_number", "-")), ("Typ", document.get("doc_type", "-")), ("Data", document.get("created_at", "-")), ("Magazyn", document.get("warehouse_name", "-")), ("Strona", counterparty or "-"), ("Operator", document.get("user_name", "System")), ("Status", document.get("status", "issued"))]:
+    for label, value in [
+        (tr("Numer", "Number"), document.get("doc_number", "-")),
+        (tr("Typ", "Type"), document.get("doc_type", "-")),
+        (tr("Data", "Date"), document.get("created_at", "-")),
+        (tr("Magazyn", "Warehouse"), document.get("warehouse_name", "-")),
+        (tr("Strona", "Counterparty"), counterparty or "-"),
+        (tr("Operator", "Operator"), document.get("user_name", "System")),
+        (tr("Status", "Status"), document.get("status", "issued")),
+    ]:
         pdf.cell(38, 7, clean_pdf_text(f"{label}:"), 0, 0)
         pdf.cell(0, 7, clean_pdf_text(value), ln=True)
 
     if document.get("notes"):
         pdf.ln(2)
         pdf.set_font("Arial", "B", 10)
-        pdf.cell(0, 7, "Uwagi", ln=True)
+        pdf.cell(0, 7, clean_pdf_text(tr("Uwagi", "Notes")), ln=True)
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 6, clean_pdf_text(document.get("notes") or "-"))
 
     pdf.ln(4)
     pdf.set_font("Arial", "B", 9)
-    for label, width in [("Produkt", 72), ("Ilosc", 18), ("Cena", 24), ("Rabat %", 22), ("Wartosc", 28)]:
+    for label, width in [
+        (tr("Produkt", "Product"), 72),
+        (tr("Ilosc", "Qty"), 18),
+        (tr("Cena", "Price"), 24),
+        (tr("Rabat %", "Discount %"), 22),
+        (tr("Wartosc", "Value"), 28),
+    ]:
         pdf.cell(width, 8, clean_pdf_text(label), 1, 0, "C", True)
     pdf.ln()
     pdf.set_font("Arial", size=9)
@@ -2246,9 +2676,13 @@ def build_document_pdf(document, items, settings):
     summary = summarize_line_items(items)
     currency = clean_pdf_text(settings.get("currency") or "PLN")
     pdf.ln(4)
-    for label, value in [("Suma przed rabatem", summary["subtotal"]), ("Rabat", summary["discount_total"]), ("Razem", summary["total"] )]:
+    for label, value in [
+        (tr("Suma przed rabatem", "Subtotal"), summary["subtotal"]),
+        (tr("Rabat", "Discount"), summary["discount_total"]),
+        (tr("Razem", "Total"), summary["total"]),
+    ]:
         pdf.set_font("Arial", "B", 10)
-        pdf.cell(124, 8, label, 1, 0, "R", True)
+        pdf.cell(124, 8, clean_pdf_text(label), 1, 0, "R", True)
         pdf.cell(40, 8, f"{value:.2f} {currency}", 1, 0, "R")
         pdf.ln()
 
@@ -2285,14 +2719,13 @@ def document_pdf(document_id):
     file_path = os.path.join(BACKUP_FOLDER, file_name)
     with open(file_path, "wb") as output_file:
         output_file.write(pdf_output)
-    record_archive("document", f"Dokument {document['doc_number']}", file_name, file_path)
+    record_archive("document", trf("Dokument {doc_number}", "Document {doc_number}", doc_number=document['doc_number']), file_name, file_path)
     response = make_response(pdf_output)
     response.headers["Content-Type"] = "application/pdf"
     response.headers["Content-Disposition"] = f"attachment; filename={file_name}"
     return response
 
 
-@app.route("/stocktakes", methods=["GET", "POST"])
 @app.route("/stocktakes", methods=["GET", "POST"])
 @login_required
 def stocktakes():
@@ -2417,7 +2850,7 @@ def stocktake_mobile(stocktake_id):
                 SET counted_quantity = ?, difference = ?, note = ?, updated_at = ?
                 WHERE stocktake_id = ? AND batch_id = ?
                 """, (counted_quantity, difference, clean_value(request.form.get("note")), now_iso(), stocktake_id, batch_id))
-            flash("Zapisano pozycj? w mobilnym widoku spisu.", "success")
+            flash("Zapisano pozycjÄ w mobilnym widoku spisu.", "success")
         return redirect(url_for("stocktake_mobile", stocktake_id=stocktake_id))
 
     items = query_all("""
@@ -2571,20 +3004,20 @@ def movements():
                 (batch_id,),
             ).fetchone()
             if not batch or quantity <= 0:
-                flash("Wybierz partię i ilość większą od zera.", "error")
+                flash("Wybierz partiÄ i iloÅÄ wiÄkszÄ od zera.", "error")
                 return redirect(url_for("movements"))
 
             current_quantity = int_safe(batch["quantity"], 0)
             if movement_type in {"adjustment_out", "transfer"} and quantity > current_quantity:
-                flash("Brak wystarczającej ilości do wykonania ruchu.", "error")
+                flash("Brak wystarczajÄcej iloÅci do wykonania ruchu.", "error")
                 return redirect(url_for("movements"))
 
             if movement_type == "adjustment_in":
                 connection.execute("UPDATE stock_batches SET quantity = quantity + ?, updated_at = ? WHERE id = ?", (quantity, now_iso(), batch_id))
-                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], movement_type, quantity, "manual", batch_id, notes or "Ręczne zwiększenie stanu")
+                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], movement_type, quantity, "manual", batch_id, notes or "RÄczne zwiÄkszenie stanu")
             elif movement_type == "adjustment_out":
                 connection.execute("UPDATE stock_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?", (quantity, now_iso(), batch_id))
-                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], movement_type, quantity, "manual", batch_id, notes or "Ręczne zmniejszenie stanu")
+                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], movement_type, quantity, "manual", batch_id, notes or "RÄczne zmniejszenie stanu")
             elif movement_type == "transfer" and target_warehouse_id:
                 connection.execute("UPDATE stock_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?", (quantity, now_iso(), batch_id))
                 new_batch_id = connection.execute(
@@ -2592,38 +3025,36 @@ def movements():
                     INSERT INTO stock_batches (product_id, warehouse_id, quantity, expiry_date, purchase_date, lot_number, serial_number, document, image, is_active, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                     """,
-                    (
-                        batch["product_id"],
-                        target_warehouse_id,
-                        quantity,
-                        batch["expiry_date"],
-                        batch["purchase_date"],
-                        batch["lot_number"],
-                        batch["serial_number"],
-                        batch["document"],
-                        batch["image"],
-                        now_iso(),
-                        now_iso(),
-                    ),
+                    (batch["product_id"], target_warehouse_id, quantity, batch["expiry_date"], batch["purchase_date"], batch["lot_number"], batch["serial_number"], batch["document"], batch["image"], now_iso(), now_iso()),
                 ).lastrowid
-                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], "transfer_out", quantity, "transfer", new_batch_id, notes or "Przesunięcie z magazynu")
-                create_stock_movement(connection, batch["product_id"], new_batch_id, target_warehouse_id, "transfer_in", quantity, "transfer", batch_id, notes or "Przesunięcie do magazynu")
+                create_stock_movement(connection, batch["product_id"], batch_id, batch["warehouse_id"], "transfer_out", quantity, "transfer", new_batch_id, notes or "PrzesuniÄcie z magazynu")
+                create_stock_movement(connection, batch["product_id"], new_batch_id, target_warehouse_id, "transfer_in", quantity, "transfer", batch_id, notes or "PrzesuniÄcie do magazynu")
             else:
-                flash("Nieprawidłowy typ ruchu magazynowego.", "error")
+                flash("NieprawidÅowy typ ruchu magazynowego.", "error")
                 return redirect(url_for("movements"))
 
             connection.commit()
 
-        log_audit("create", "movement", batch_id, f"Zapisano ruch magazynowy typu {movement_type}")
-        flash("Ruch magazynowy został zapisany.", "success")
+        log_audit("create", "movement", batch_id, f"Zapisano ruch magazynowy typu {movement_type}", after_state=format_state_pairs({"movement_type": movement_type, "quantity": quantity, "target_warehouse_id": target_warehouse_id or "-"}))
+        flash("Ruch magazynowy zostaÅ zapisany.", "success")
         return redirect(url_for("movements"))
 
-    return render_template(
-        "movements.html",
-        inventory_items=get_inventory_items(),
-        warehouses=get_warehouses(),
-        movements=get_recent_movements(30),
-    )
+    return render_template("movements.html", inventory_items=get_inventory_items(), warehouses=get_warehouses(), movements=get_recent_movements(30))
+
+
+@app.route("/movements/<int:movement_id>/reverse", methods=["POST"])
+@login_required
+@role_required("admin", "manager")
+def movement_reverse(movement_id):
+    reason = clean_value(request.form.get("reason"))
+    try:
+        reverse_manual_movement(movement_id, reason)
+        flash("Ruch magazynowy zostaÅ cofniÄty.", "success")
+    except ValueError as error:
+        flash(str(error), "error")
+    return redirect(url_for("movements"))
+
+
 
 
 @app.route("/alerts")
@@ -2894,11 +3325,11 @@ def manager_export_file(kind):
     filename = f"manager_{kind}_{today_iso()}.csv"
 
     if kind == "daily-sales":
-        writer.writerow(["id", "customer", "payment", "status", "amount", "created_at"])
+        writer.writerow(["id", tr("klient", "customer"), tr("platnosc", "payment"), tr("status", "status"), tr("kwota", "amount"), tr("utworzono", "created_at")])
         for sale in get_recent_sales(100):
             writer.writerow([sale["id"], sale["customer_name"], sale["payment_method"], sale["status"], sale["total_amount"], sale["created_at"]])
     elif kind == "top-products":
-        writer.writerow(["title", "sold_quantity"])
+        writer.writerow([tr("produkt", "title"), tr("sprzedana_ilosc", "sold_quantity")])
         for row in query_all(
             """
             SELECT p.title, COALESCE(SUM(si.quantity), 0) AS sold_quantity
@@ -2911,7 +3342,7 @@ def manager_export_file(kind):
         ):
             writer.writerow([row["title"], row["sold_quantity"]])
     elif kind == "dead-stock":
-        writer.writerow(["title", "sku", "category"])
+        writer.writerow([tr("produkt", "title"), "sku", tr("kategoria", "category")])
         for row in query_all(
             """
             SELECT p.title, p.sku, p.category
@@ -2923,23 +3354,23 @@ def manager_export_file(kind):
         ):
             writer.writerow([row["title"], row["sku"], row["category"]])
     elif kind == "shortages":
-        writer.writerow(["title", "warehouse", "quantity", "minimum"])
+        writer.writerow([tr("produkt", "title"), tr("magazyn", "warehouse"), tr("ilosc", "quantity"), tr("minimum", "minimum")])
         for item in get_inventory_items():
             if item["is_low"]:
                 writer.writerow([item["title"], item["warehouse_name"], item["quantity_int"], item["min_quantity_int"]])
     elif kind == "inventory-value":
-        writer.writerow(["title", "warehouse", "quantity", "purchase_price", "value"])
+        writer.writerow([tr("produkt", "title"), tr("magazyn", "warehouse"), tr("ilosc", "quantity"), tr("cena_zakupu", "purchase_price"), tr("wartosc", "value")])
         for item in get_inventory_items():
             writer.writerow([item["title"], item["warehouse_name"], item["quantity_int"], item["purchase_price_float"], item["total_value"]])
     else:
-        flash("Nieznany typ eksportu.", "error")
+        flash(tr("Nieznany typ eksportu.", "Unknown export type."), "error")
         return redirect(url_for("manager_exports"))
 
     data = output.getvalue()
     export_path = os.path.join(BACKUP_FOLDER, filename)
     with open(export_path, "w", encoding="utf-8", newline="") as export_file:
         export_file.write(data)
-    record_archive("manager-export", f"Eksport menedżerski: {kind}", filename, export_path)
+    record_archive("manager-export", trf("Eksport menedzerski: {kind}", "Manager export: {kind}", kind=kind), filename, export_path)
 
     response = make_response(data)
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
@@ -3059,14 +3490,22 @@ def inventory_report():
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, txt="RAPORT SID 4.0 - STAN MAGAZYNU", ln=True, align="C")
+    pdf.cell(190, 10, txt=clean_pdf_text(tr("RAPORT SID 4.0 - STAN MAGAZYNU", "SID 4.0 REPORT - INVENTORY STATUS")), ln=True, align="C")
     pdf.set_font("Arial", size=10)
-    pdf.cell(190, 10, txt=f"Wygenerowano: {today_iso()}", ln=True, align="C")
+    pdf.cell(190, 10, txt=clean_pdf_text(trf("Wygenerowano: {date}", "Generated: {date}", date=today_iso())), ln=True, align="C")
     pdf.ln(8)
 
     pdf.set_font("Arial", "B", 8)
     pdf.set_fill_color(230, 230, 230)
-    headers = [("Produkt", 45), ("Magazyn", 32), ("Ilosc", 15), ("Zakup", 20), ("Sprzedaz", 22), ("Wartosc", 24), ("Waznosc", 28)]
+    headers = [
+        (tr("Produkt", "Product"), 45),
+        (tr("Magazyn", "Warehouse"), 32),
+        (tr("Ilosc", "Qty"), 15),
+        (tr("Zakup", "Purchase"), 20),
+        (tr("Sprzedaz", "Sale"), 22),
+        (tr("Wartosc", "Value"), 24),
+        (tr("Waznosc", "Expiry"), 28),
+    ]
     for label, width in headers:
         pdf.cell(width, 9, clean_pdf_text(label), 1, 0, "C", True)
     pdf.ln()
@@ -3086,14 +3525,14 @@ def inventory_report():
 
     pdf.ln(4)
     pdf.set_font("Arial", "B", 10)
-    pdf.cell(160, 10, "Laczna wartosc magazynu:", 1, 0, "R", True)
-    pdf.cell(30, 10, f"{total_value:.2f} zl", 1, 0, "C", True)
+    pdf.cell(160, 10, clean_pdf_text(tr("Laczna wartosc magazynu:", "Total inventory value:")), 1, 0, "R", True)
+    pdf.cell(30, 10, clean_pdf_text(f"{total_value:.2f} zl"), 1, 0, "C", True)
 
     pdf_output = pdf.output(dest="S")
     if isinstance(pdf_output, str):
         pdf_output = pdf_output.encode("latin-1")
 
-    report_name = f"sid_raport_magazynu_{today_iso()}.pdf"
+    report_name = f"sid_inventory_report_{today_iso()}.pdf" if get_current_language() == "en" else f"sid_raport_magazynu_{today_iso()}.pdf"
     report_path = os.path.join(BACKUP_FOLDER, report_name)
     with open(report_path, "wb") as report_file:
         report_file.write(pdf_output)
@@ -3101,7 +3540,7 @@ def inventory_report():
     response = make_response(pdf_output)
     response.headers["Content-Type"] = "application/pdf"
     response.headers["Content-Disposition"] = f"attachment; filename={report_name}"
-    record_archive("report", "Raport magazynu", report_name, report_path)
+    record_archive("report", tr("Raport magazynu", "Inventory report"), report_name, report_path)
     return response
 
 

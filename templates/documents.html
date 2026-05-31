@@ -1,7 +1,57 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Dokumenty | SID 4.0{% endblock %}
 {% block page_title %}Dokumenty PZ / WZ / FV{% endblock %}
 {% block page_subtitle %}Rejestr dokumentów magazynowych i handlowych generowanych przez system.{% endblock %}
 {% block content %}
-<section class="panel-card"><div class="panel-head"><h3><i class="fas fa-file-invoice"></i> Lista dokumentów</h3><span>Ostatnie 100 dokumentów</span></div><div class="table-wrap"><table><thead><tr><th>Numer</th><th>Typ</th><th>Powiązanie</th><th>Klient / dostawca</th><th>Magazyn</th><th>Kwota</th><th>Data</th><th>Akcje</th></tr></thead><tbody>{% for document in documents %}<tr><td><a href="{{ url_for('document_detail', document_id=document.id) }}">{{ document.doc_number }}</a></td><td><span class="badge badge-neutral">{{ document.doc_type }}</span></td><td>{{ document.related_type }} #{{ document.related_id }}</td><td>{% if document.customer_name != 'Brak klienta' %}{{ document.customer_name }}{% else %}{{ document.supplier_name }}{% endif %}</td><td>{{ document.warehouse_name }}</td><td>{{ "%.2f"|format(document.total_amount) }} zł</td><td>{{ document.created_at }}</td><td><div class="inline-actions"><a href="{{ url_for('document_detail', document_id=document.id) }}" class="btn-secondary">Podgląd</a><a href="{{ url_for('document_pdf', document_id=document.id) }}" class="icon-btn"><i class="fas fa-file-pdf"></i></a></div></td></tr>{% else %}<tr><td colspan="8">Brak dokumentów.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel-card">
+    <div class="panel-head">
+        <h3><i class="fas fa-file-invoice"></i> Lista dokumentów</h3>
+        <span>Ostatnie 100 dokumentów</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Numer</th>
+                    <th>Typ</th>
+                    <th>Powiązanie</th>
+                    <th>Klient / dostawca</th>
+                    <th>Magazyn</th>
+                    <th>Kwota</th>
+                    <th>Data</th>
+                    <th>Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for document in documents %}
+                    <tr>
+                        <td><a href="{{ url_for('document_detail', document_id=document.id) }}">{{ document.doc_number }}</a></td>
+                        <td><span class="badge badge-neutral">{{ document.doc_type }}</span></td>
+                        <td>{{ document.related_type }} #{{ document.related_id }}</td>
+                        <td>
+                            {% if document.customer_name != 'Brak klienta' %}
+                                {{ document.customer_name }}
+                            {% else %}
+                                {{ document.supplier_name }}
+                            {% endif %}
+                        </td>
+                        <td>{{ document.warehouse_name }}</td>
+                        <td>{{ "%.2f"|format(document.total_amount) }} zł</td>
+                        <td>{{ document.created_at }}</td>
+                        <td>
+                            <div class="inline-actions">
+                                <a href="{{ url_for('document_detail', document_id=document.id) }}" class="btn-secondary">Podgląd</a>
+                                <a href="{{ url_for('document_pdf', document_id=document.id) }}" class="icon-btn"><i class="fas fa-file-pdf"></i></a>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8">Brak dokumentów.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}

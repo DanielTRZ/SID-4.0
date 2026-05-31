@@ -1,8 +1,28 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Tryb mobilny | SID 4.0{% endblock %}
-{% block page_title %}Tryb mobilny magazyniera{% endblock %}
+{% block page_title %}Tryb mobilny{% endblock %}
 {% block page_subtitle %}Lekki podgląd do szybkiej zmiany ilości, lokalizacji i kontroli partii na telefonie.{% endblock %}
 {% block content %}
-<section class="toolbar"><div class="search-box"><i class="fas fa-search"></i><input type="text" id="mobile-search" placeholder="Szukaj po nazwie, kategorii, magazynie lub SKU"></div></section>
-<section class="mobile-list">{% for item in items %}<article class="mobile-card" id="mobile-card-{{ item.batch_id }}" data-mobile-card data-search="{{ (item.title ~ ' ' ~ item.category ~ ' ' ~ item.warehouse_name ~ ' ' ~ (item.sku or ''))|lower }}"><div><strong>{{ item.title }}</strong><p>{{ item.warehouse_name }} · {{ item.category }}</p><span id="mobile-qty-{{ item.batch_id }}">Stan: {{ item.quantity_int }} / dostępne: {{ item.available_quantity_int }} / rez.: {{ item.reserved_quantity_int }}</span></div><div class="action-group"><button type="button" class="qty-btn minus" onclick="changeQty({{ item.batch_id }}, 'dec')">-</button><button type="button" class="qty-btn plus" onclick="changeQty({{ item.batch_id }}, 'inc')">+</button></div></article>{% else %}<article class="mobile-card"><strong>Brak pozycji</strong><p>Magazyn jest pusty.</p></article>{% endfor %}</section>
+<section class="panel-card">
+    <div class="panel-head">
+        <h3><i class="fas fa-mobile-screen"></i> Szybki podgląd partii</h3>
+        <span>Widok zoptymalizowany pod pracę mobilną</span>
+    </div>
+    <div class="mobile-list">
+        {% for item in items %}
+            <article class="mobile-card">
+                <div class="mobile-card-copy">
+                    <strong>{{ item.title }}</strong>
+                    <p>{{ item.warehouse_name }} - {{ item.category }}</p>
+                    <span id="mobile-qty-{{ item.batch_id }}">Stan: {{ item.quantity_int }} / dostępne: {{ item.available_quantity_int }} / rez.: {{ item.reserved_quantity_int }}</span>
+                </div>
+                <div class="mobile-actions">
+                    <a href="{{ url_for('inventory') }}" class="btn-secondary">Otwórz w magazynie</a>
+                </div>
+            </article>
+        {% else %}
+            <article class="mobile-card"><strong>Brak danych</strong><p>Brak pozycji do wyświetlenia.</p></article>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}
